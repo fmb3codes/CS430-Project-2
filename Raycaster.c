@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 
 
 // function prototypes
@@ -28,6 +29,10 @@ double* next_vector(FILE* json);
 void read_scene(char* filename);
 
 void print_objects();
+
+void normalize(double* v);
+
+void raycasting();
 
 
 // object struct typedef'd as Object intended to hold any of the specified objects in the given scene (.json) file
@@ -69,7 +74,7 @@ int main(int argc, char** argv) {
   char* input_file = argv[3]; // a .json file to read from
   char* output_file = argv[4]; // a .ppm file to output to
   
-  objects = malloc(sizeof(Object*)*30);
+  objects = malloc(sizeof(Object*)*129); // 128 max objects
   
   // ADD ERROR CHECKING FOR CORRECT FILE EXTENSIONS
   
@@ -78,8 +83,33 @@ int main(int argc, char** argv) {
   read_scene(input_file);
   printf("Finished parsing!\n");
   print_objects();
+  printf("About to start raycasting...\n");
+  raycasting();
+  
   
   return 0;
+}
+
+void raycasting() // go back and add function prototype
+{
+	int i = 0;
+	while(objects[i] != NULL) // want to raycast every object
+	{
+		Object* temp_object = objects[i]; // may be unnecessary?
+		
+		
+
+		
+		i++;
+	}
+}
+
+
+void normalize(double* v) {
+  double len = sqrt(sqrt(v[0]) + sqrt(v[1]) + sqrt(v[2]));
+  v[0] /= len;
+  v[1] /= len;
+  v[2] /= len;
 }
 
 void print_objects()
