@@ -12,31 +12,40 @@
 #include <ctype.h>
 
 
-//Function Prototypes
+// function prototypes
 int next_c(FILE* json);
+
 void expect_c(FILE* json, int d);
+
 void skip_ws(FILE* json);
+
 char* next_string(FILE* json);
+
 double next_number(FILE* json);
+
 double* next_vector(FILE* json);
+
 void read_scene(char* filename);
 
-// Object struct intended to hold any of the specified objects
+void print_objects();
+
+
+// object struct typedef'd as Object intended to hold any of the specified objects in the given scene (.json) file
 typedef struct {
   int kind; // 0 = camera, 1 = sphere, 2 = plane
-  double color[3];
+  double color[3]; // potentially remove here and add below
   union {
     struct {
       double width;
       double height;
     } camera;
     struct {
-      double color[3];
+      //double color[3];
       double position[3];
       double radius;
     } sphere;
     struct {
-      double color[3];
+      //double color[3];
 	  double position[3];
 	  double normal[3];
     } plane;
@@ -44,6 +53,8 @@ typedef struct {
 } Object;
 
 int line = 1; // global int line variable to keep track of line in file
+
+ Object** objects;
 
 int main(int argc, char** argv) {
 	
@@ -58,10 +69,57 @@ int main(int argc, char** argv) {
   char* input_file = argv[3]; // a .json file to read from
   char* output_file = argv[4]; // a .ppm file to output to
   
-  read_scene(input_file);
+  objects = malloc(sizeof(Object*)*30);
   
+  // ADD ERROR CHECKING FOR CORRECT FILE EXTENSIONS
+  
+  // ALSO DO ERROR CHECKING WITH GIVEN NEXT_NUM/VECTOR FUNC
+  
+  read_scene(input_file);
+  printf("Finished parsing!\n");
+  print_objects();
   
   return 0;
+}
+
+void print_objects()
+{
+	int i = 0;
+	while(objects[i] != NULL)
+	{
+			if(objects[i]->kind == 0)
+			{
+				printf("#%d object is a camera\n", i);
+				printf("Camera width is: %lf\n", objects[i]->camera.width);
+				printf("Camera height is: %lf\n", objects[i]->camera.height);
+				printf("-------------------------------------------------------\n");
+				i++;
+			}
+			else if(objects[i]->kind == 1)
+			{
+				printf("#%d object is a sphere\n", i);
+				printf("Sphere color is: [%lf, %lf, %lf]\n", objects[i]->color[0], objects[i]->color[1], objects[i]->color[2]);
+				printf("Sphere position is: [%lf, %lf, %lf]\n", objects[i]->sphere.position[0], objects[i]->sphere.position[1], objects[i]->sphere.position[2]);
+				printf("Sphere radius is: %lf\n", objects[i]->sphere.radius);
+				printf("-------------------------------------------------------\n");
+				i++;
+			}
+			else if(objects[i]->kind == 2)
+			{
+				printf("#%d object is a plane\n", i);
+				printf("Plane color is: [%lf, %lf, %lf]\n", objects[i]->color[0], objects[i]->color[1], objects[i]->color[2]);
+				printf("Plane position is: [%lf, %lf, %lf]\n", objects[i]->plane.position[0], objects[i]->plane.position[1], objects[i]->plane.position[2]);
+				printf("Plane normal is: [%lf, %lf, %lf]\n", objects[i]->plane.normal[0], objects[i]->plane.normal[1], objects[i]->plane.normal[2]);
+				printf("-------------------------------------------------------\n");
+				i++;
+			}
+			else
+			{
+				fprintf(stderr, "Error: Unrecognized object.\n");
+				exit(1);
+			}
+
+	}
 }
 
 // next_c() wraps the getc() function and provides error checking and line
@@ -136,8 +194,12 @@ char* next_string(FILE* json) {
 
 double next_number(FILE* json) {
   double value;
-  fscanf(json, "%f", &value);
-  // Error check this..
+  //printf("Current file location is: %d\n", ftell(json));
+  fscanf(json, "%lf", &value);
+  //printf("New file location is: %d\n", ftell(json));
+  //printf("Read in number is: %lf\n", value);
+  // advance if comma
+  // Error check this.. DO THIS
   return value;
 }
 
@@ -146,14 +208,17 @@ double* next_vector(FILE* json) {
   expect_c(json, '[');
   skip_ws(json);
   v[0] = next_number(json);
+  printf("Read in number (vector) is: %lf.\n", v[0]);
   skip_ws(json);
   expect_c(json, ',');
   skip_ws(json);
   v[1] = next_number(json);
+  printf("Read in number (vector) is: %lf.\n", v[1]);
   skip_ws(json);
   expect_c(json, ',');
   skip_ws(json);
   v[2] = next_number(json);
+  printf("Read in number (vector) is: %lf.\n", v[2]);
   skip_ws(json);
   expect_c(json, ']');
   return v;
@@ -176,6 +241,12 @@ void read_scene(char* filename) {
 
   skip_ws(json);
 
+  // allocates memory to objects; may need to rethink this area if more objects are needed
+  //Object** objects;
+  //objects = malloc(sizeof(Object*)*30); // currently assuming large (and arbitrary) number of objects
+  int i = 0;
+  
+  
   // Find the objects
 
   while (1) {
@@ -204,11 +275,29 @@ void read_scene(char* filename) {
       char* value = next_string(json);
 
       if (strcmp(value, "camera") == 0) {
+		  objects[i] = malloc(sizeof(Object));
+		  objects[i]->kind = 0;
+		  
+		  //i++; // increment i after we no longer need to access the object
+		  
+		  
       } else if (strcmp(value, "sphere") == 0) {
+		  objects[i] = malloc(sizeof(Object));
+		  objects[i]->kind = 1;
+		  
+		 // i++; // increment i after we no longer need to access the object
+
+		  
       } else if (strcmp(value, "plane") == 0) {
+		  objects[i] = malloc(sizeof(Object));
+		  objects[i]->kind = 2;
+		  
+		  //i++; // increment i after we no longer need to access the object
+
+		  
       } else {
-	fprintf(stderr, "Error: Unknown type, \"%s\", on line number %d.\n", value, line);
-	exit(1);
+		fprintf(stderr, "Error: Unknown type, \"%s\", on line number %d.\n", value, line);
+		exit(1);
       }
 
       skip_ws(json);
@@ -218,6 +307,8 @@ void read_scene(char* filename) {
 	c = next_c(json);
 	if (c == '}') {
 	  // stop parsing this object
+	  printf("Finished parsing object so incrementing iterator. Before increment: %d\n", i);
+	  i++;
 	  break;
 	} else if (c == ',') {
 	  // read another field
@@ -230,10 +321,60 @@ void read_scene(char* filename) {
 	      (strcmp(key, "height") == 0) ||
 	      (strcmp(key, "radius") == 0)) {
 	    double value = next_number(json);
+		if(strcmp(key, "width") == 0)
+		{
+			printf("Currently assigning width: %f.\n", value);
+			objects[i]->camera.width = value;
+		}
+		else if(strcmp(key, "height") == 0)
+		{
+			printf("Currently assigning height %f.\n", value);
+			objects[i]->camera.height = value;
+		}
+		else
+		{
+			printf("Currently assigning radius %f.\n", value);
+			objects[i]->sphere.radius = value;
+		}
+		
 	  } else if ((strcmp(key, "color") == 0) ||
 		     (strcmp(key, "position") == 0) ||
-		     (strcmp(key, "normal") == 0)) {
+		     (strcmp(key, "normal") == 0)) { // do additional error checking with color
 	    double* value = next_vector(json);
+		if(strcmp(key, "color") == 0)
+		{
+			printf("Currently assigning colors [%d, %d, %d]\n", value[0], value[1], value[2]);
+			objects[i]->color[0] = value[0];
+			objects[i]->color[1] = value[1];
+			objects[i]->color[2] = value[2];
+		}
+		else if(strcmp(key, "position") == 0)
+		{
+			printf("Currently assigning position [%d, %d, %d]\n", value[0], value[1], value[2]);
+			if(objects[i]->kind == 1)
+			{
+				objects[i]->sphere.position[0] = value[0];
+				objects[i]->sphere.position[1] = value[1];
+				objects[i]->sphere.position[2] = value[2];
+			}
+			else if(objects[i]->kind == 2)
+			{
+				objects[i]->plane.position[0] = value[0];
+				objects[i]->plane.position[1] = value[1];
+				objects[i]->plane.position[2] = value[2];
+			}
+			else
+			{
+				fprintf(stderr, "Error: Mismatched object field, on line %d.\n", key, line);
+			}
+		}
+		else
+		{
+			printf("Currently assigning normal [%d, %d, %d]\n", value[0], value[1], value[2]);
+			objects[i]->plane.normal[0] = value[0];
+			objects[i]->plane.normal[1] = value[1];
+			objects[i]->plane.normal[2] = value[2];
+		}
 	  } else {
 	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n",
 		    key, line);
@@ -251,6 +392,8 @@ void read_scene(char* filename) {
 	// noop
 	skip_ws(json);
       } else if (c == ']') {
+	printf("Reached end of objects so null-terminating and current index is: %d.\n", i);
+	objects[i] = NULL; // null-terminate after last object
 	fclose(json);
 	return;
       } else {
