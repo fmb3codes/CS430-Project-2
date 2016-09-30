@@ -1,9 +1,68 @@
+//
+//  raycaster.c
+//  CS430 Project 2
+//
+//  Frankie Berry
+//
+
+// pre-processor directives
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
-int line = 1;
+
+//Function Prototypes
+int next_c(FILE* json);
+void expect_c(FILE* json, int d);
+void skip_ws(FILE* json);
+char* next_string(FILE* json);
+double next_number(FILE* json);
+double* next_vector(FILE* json);
+void read_scene(char* filename);
+
+// Object struct intended to hold any of the specified objects
+typedef struct {
+  int kind; // 0 = camera, 1 = sphere, 2 = plane
+  double color[3];
+  union {
+    struct {
+      double width;
+      double height;
+    } camera;
+    struct {
+      double color[3];
+      double position[3];
+      double radius;
+    } sphere;
+    struct {
+      double color[3];
+	  double position[3];
+	  double normal[3];
+    } plane;
+  };
+} Object;
+
+int line = 1; // global int line variable to keep track of line in file
+
+int main(int argc, char** argv) {
+	
+	if(argc != 5) // checks for 5 arguments which includes the argv[0] path argument as well as the 4 required arguments of format [width height input.json output.ppm]
+	{
+		fprintf(stderr, "Error: Incorrect number of arguments; format should be -> [width height input.json output.ppm]\n");
+		return -1;
+	}
+	
+  int width = atoi(argv[1]); // the width of the scene
+  int height = atoi(argv[2]); // the height of the scene
+  char* input_file = argv[3]; // a .json file to read from
+  char* output_file = argv[4]; // a .ppm file to output to
+  
+  read_scene(input_file);
+  
+  
+  return 0;
+}
 
 // next_c() wraps the getc() function and provides error checking and line
 // number maintenance
@@ -200,44 +259,4 @@ void read_scene(char* filename) {
       }
     }
   }
-}
-
-// Object struct intended to hold any of the specified objects
-typedef struct {
-  int kind; // 0 = camera, 1 = sphere, 2 = plane
-  double color[3];
-  union {
-    struct {
-      double width;
-      double height;
-    } camera;
-    struct {
-      double color[3];
-      double position[3];
-      double radius;
-    } sphere;
-    struct {
-      double color[3];
-	  double position[3];
-	  double normal[3];
-    } plane;
-  };
-} Object;
-
-int main(int c, char** argv) {
-	
-	if(argc != 5) // checks for 5 arguments which includes the argv[0] path argument as well as the 4 required arguments of format [width height input.json output.ppm]
-	{
-		fprintf(stderr, "Error: Incorrect number of arguments; format should be -> [width height input.json output.ppm]\n");
-		return -1;
-	}
-	
-  int width = argv[1]; // the width of the scene
-  int height = argv[2]; // the height of the scene
-  char* inputfile = argv[3]; // a .json file to read from
-  char* outputfile = argv[4]; // a .ppm file to output to
-  read_scene(argv[1]);
-  
-  
-  return 0;
 }
