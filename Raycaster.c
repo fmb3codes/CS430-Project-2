@@ -202,7 +202,42 @@ void read_scene(char* filename) {
   }
 }
 
+// Object struct intended to hold any of the specified objects
+typedef struct {
+  int kind; // 0 = camera, 1 = sphere, 2 = plane
+  double color[3];
+  union {
+    struct {
+      double width;
+      double height;
+    } camera;
+    struct {
+      double color[3];
+      double position[3];
+      double radius;
+    } sphere;
+    struct {
+      double color[3];
+	  double position[3];
+	  double normal[3];
+    } plane;
+  };
+} Object;
+
 int main(int c, char** argv) {
+	
+	if(argc != 5) // checks for 5 arguments which includes the argv[0] path argument as well as the 4 required arguments of format [width height input.json output.ppm]
+	{
+		fprintf(stderr, "Error: Incorrect number of arguments; format should be -> [width height input.json output.ppm]\n");
+		return -1;
+	}
+	
+  int width = argv[1]; // the width of the scene
+  int height = argv[2]; // the height of the scene
+  char* inputfile = argv[3]; // a .json file to read from
+  char* outputfile = argv[4]; // a .ppm file to output to
   read_scene(argv[1]);
+  
+  
   return 0;
 }
