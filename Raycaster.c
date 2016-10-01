@@ -34,6 +34,12 @@ void normalize(double* v);
 
 void raycasting();
 
+double sphere_intersection(double* Ro, double* Rd, double* C, double r);
+
+double sqr(double v);
+
+void write_image_data(char* output_file_name);
+
 
 // object struct typedef'd as Object intended to hold any of the specified objects in the given scene (.json) file
 typedef struct {
@@ -57,9 +63,33 @@ typedef struct {
   };
 } Object;
 
+// header_data buffer which is intended to contain all relevant header information of ppm file
+typedef struct header_data {
+  char* file_format;
+  char* file_comment;
+  char* file_height;
+  char* file_width;
+  char* file_maxcolor;
+} header_data;
+
+// image_data buffer which is intended to hold a set of RGB pixels represented as unsigned char's
+typedef struct image_data {
+  unsigned char r, g, b;
+} image_data;
+
 int line = 1; // global int line variable to keep track of line in file
 
- Object** objects;
+// global header_data buffer
+header_data *header_buffer;
+
+// global image_data buffer
+image_data *image_buffer;
+
+// global set of objects from json file
+Object** objects;
+
+double glob_width = 0; // global width, potentially temporary but intended to store camera width
+double glob_height = 0; // global height, potentially temporary but intended to store camera height
 
 int main(int argc, char** argv) {
 	
@@ -78,35 +108,178 @@ int main(int argc, char** argv) {
   
   // ADD ERROR CHECKING FOR CORRECT FILE EXTENSIONS
   
+  // block of code allocating memory to global header_buffer before its use
+  header_buffer = (struct header_data*)malloc(sizeof(struct header_data)); 
+  header_buffer->file_format = (char *)malloc(100);
+  header_buffer->file_comment = (char *)malloc(1024);
+  header_buffer->file_height = (char *)malloc(100);
+  header_buffer->file_width = (char *)malloc(100);
+  header_buffer->file_maxcolor = (char *)malloc(100);
+  
+  strcpy(header_buffer->file_format, "P3");
+  sprintf(header_buffer->file_height, "%d", height);
+  sprintf(header_buffer->file_width, "%d", width);
+  sprintf(header_buffer->file_maxcolor, "%d", 255);
+  
   // ALSO DO ERROR CHECKING WITH GIVEN NEXT_NUM/VECTOR FUNC
+  
+  image_buffer = (image_data *)malloc(sizeof(image_data) * atoi(header_buffer->file_width) * atoi(header_buffer->file_height)  + 1);
   
   read_scene(input_file);
   printf("Finished parsing!\n");
   print_objects();
   printf("About to start raycasting...\n");
   raycasting();
+  printf("Done raycasting and determining pixel colors, now writing to file...\n");
+  
+  // testing code to delete file in order to prevent data overflow
+  FILE* test_fp = fopen(output_file, "r");
+  if(test_fp != NULL) remove(output_file);
+  else if(test_fp == NULL) printf("File doesn't exist\n");
+  // end of testing code
+  
+  
+  write_image_data(output_file);
   
   
   return 0;
 }
 
-void raycasting() // go back and add function prototype
+// currently a test sphere_intersection method
+double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 {
-	int i = 0;
-	while(objects[i] != NULL) // want to raycast every object
-	{
-		Object* temp_object = objects[i]; // may be unnecessary?
-		
-		
-
-		
-		i++;
-	}
+	double a = sqr(Ro[0]) + sqr(Rd[1]) + sqr(Rd[2]);
+	double b = (2 * Rd[0] * (Ro[0] - C[0])) + (2 * Rd[1] * (Ro[1] - C[1])) + (2 * Rd[2] * (Ro[2] - C[2]));
+	double c = sqr(C[0]) + sqr(C[1]) + sqr(C[2]) + sqr(Ro[0]) + sqr(Ro[1]) + sqr(Ro[2]) + (-2 * ((C[0] * Ro[0]) + (C[1] * Ro[1]) + (C[2] * Ro[2]))) - sqr(r);
+	
+	double det = sqr(b) - 4 * a * c;
+	if(det < 0) return -1;
+	
+	det = sqrt(det);
+	
+	double t0 = (-b - det) / (2 * a);
+	//printf("t0 value is: %lf\n", t0);
+	if(t0 > 0) return t0;
+	double t1 = (-b + det) / (2 * a);
+	//printf("t1 value is: %lf\n", t1);
+	if(t1 > 0) return t1;
+	
+	//printf("Didn't eval\n");
+	
+	return -1;
 }
 
+double plane_intersection(double* Ro, double* Rd, double* C, double n)
+{
+	double p = 0;
+	
+	return -1;
+}
+
+void raycasting() // go back and add function prototype
+{
+	//int i = 0;
+	
+	// potentially assume camera is first read in object and record height/width
+	
+	//while(objects[i] != NULL) // want to raycast every object
+	//{
+		//Object* temp_object = objects[i]; // may be unnecessary?
+		//if(objects[i]->kind == 0) // if camera we don't want to raycast?
+		//{
+			//printf("Found a camera object; skipping over it\n");
+			//i++;
+			//continue;
+		//}
+		
+		image_data current_pixel; // temp image_data struct which will hold RGB pixels
+		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through global buffer
+		current_pixel.r = (unsigned char) 255;
+		current_pixel.g = (unsigned char) 255; // initializes current pixel RGB values to 255
+		current_pixel.b = (unsigned char) 255;
+		int pixel_counter = 0;
+		
+		//*temp_ptr = current_pixel; // effectively stores current pixel in temporary buffer
+		//temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+		
+		
+		double cx = 0;
+		double cy = 0;
+		
+		int M = 20; // change?
+		int N = 20; // change?
+		
+		double pixheight = glob_height / M;
+		double pixwidth = glob_width / N;
+		
+		printf("pixheight is: %lf and pixwidth is: %lf\n", pixheight, pixwidth);
+		
+		for (int y = 0; y < M; y += 1) {
+			for (int x = 0; x < N; x += 1) {
+				double Ro[3] = {0, 0, 0};
+				// Rd = normalize(P - Ro)
+				double Rd[3] = {
+					cx - (glob_width/2) + pixwidth * (x + 0.5),
+					cy - (glob_height/2) + pixheight * (y + 0.5),
+					1
+					};
+					normalize(Rd);
+
+					double best_t = INFINITY;
+					for (int i=0; objects[i] != 0; i += 1) {
+						double t = 0;
+
+						//printf("i value is: %d.\n", i);
+						switch(objects[i]->kind) {
+						case 0:
+							break;
+						case 1:
+						    //printf("Sphere intersection check.\n");
+							t = sphere_intersection(Ro, Rd,
+														objects[i]->sphere.position,
+														objects[i]->sphere.radius);
+						    current_pixel.r = objects[i]->color[0];
+							current_pixel.g = objects[i]->color[1];
+							current_pixel.b = objects[i]->color[2];
+							break;
+						case 2:
+							//printf("Plane intersect not implemented yet\n");
+							break;
+						default:
+						// Horrible error -> FLESH out
+							exit(1);
+						}
+						if (t > 0 && t < best_t) best_t = t;
+					}
+					if (best_t > 0 && best_t != INFINITY) {
+						*temp_ptr = current_pixel; // effectively stores current pixel in temporary buffer
+						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+						printf("#");
+					} else {
+						current_pixel.r = 255;
+						current_pixel.g = 255; // resets current pixel RGB values to 255 since current_pixel is not colored (non-white in this case)
+						current_pixel.b = 255;
+						*temp_ptr = current_pixel; // effectively stores current pixel in temporary buffer
+						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+					    printf(".");
+					}
+      
+			}			
+			printf("\n");
+			}
+  
+			// i++;
+	//}
+			
+		return;
+}
+
+double sqr(double v) {
+  return v*v;
+}
 
 void normalize(double* v) {
-  double len = sqrt(sqrt(v[0]) + sqrt(v[1]) + sqrt(v[2]));
+  double len = sqrt(sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
   v[0] /= len;
   v[1] /= len;
   v[2] /= len;
@@ -355,11 +528,13 @@ void read_scene(char* filename) {
 		{
 			printf("Currently assigning width: %f.\n", value);
 			objects[i]->camera.width = value;
+			glob_width = value;
 		}
 		else if(strcmp(key, "height") == 0)
 		{
 			printf("Currently assigning height %f.\n", value);
 			objects[i]->camera.height = value;
+			glob_height = value;
 		}
 		else
 		{
@@ -373,14 +548,14 @@ void read_scene(char* filename) {
 	    double* value = next_vector(json);
 		if(strcmp(key, "color") == 0)
 		{
-			printf("Currently assigning colors [%d, %d, %d]\n", value[0], value[1], value[2]);
+			printf("Currently assigning colors [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			objects[i]->color[0] = value[0];
 			objects[i]->color[1] = value[1];
 			objects[i]->color[2] = value[2];
 		}
 		else if(strcmp(key, "position") == 0)
 		{
-			printf("Currently assigning position [%d, %d, %d]\n", value[0], value[1], value[2]);
+			printf("Currently assigning position [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			if(objects[i]->kind == 1)
 			{
 				objects[i]->sphere.position[0] = value[0];
@@ -400,7 +575,7 @@ void read_scene(char* filename) {
 		}
 		else
 		{
-			printf("Currently assigning normal [%d, %d, %d]\n", value[0], value[1], value[2]);
+			printf("Currently assigning normal [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			objects[i]->plane.normal[0] = value[0];
 			objects[i]->plane.normal[1] = value[1];
 			objects[i]->plane.normal[2] = value[2];
@@ -432,4 +607,72 @@ void read_scene(char* filename) {
       }
     }
   }
+}
+
+// write_image_data function takes in file_format to verify file output as well as the output_file_name to know where to open the file
+void write_image_data(char* output_file_name)
+{
+	FILE *fp;
+	
+	fp = fopen(output_file_name, "a"); // opens file to be appended to (file will be created if one does not exist)
+	
+	if(fp == NULL) 
+	{
+		fprintf(stderr, "Error: File couldn't be created/modified.\n");
+		exit(1); // exits out of program due to error
+	}
+	
+	char* current_line;
+	
+	// block of code which writes header information into the output file along with whitespaces accordingly
+	fprintf(fp, header_buffer->file_format); 
+	fprintf(fp, "\n");
+	fprintf(fp, header_buffer->file_width);
+	fprintf(fp, " ");
+	fprintf(fp, header_buffer->file_height);
+	fprintf(fp, "\n");
+	fprintf(fp, header_buffer->file_maxcolor);
+	fprintf(fp, "\n");
+	
+	// strcmp to check for type of input file format
+	if(strcmp(header_buffer->file_format, "P3") == 0)
+	{		
+		int i = 0; // initializes iterator variable
+		unsigned char temp[64] = {0}; // creates temp array of unsigned char
+		char temp_string[64]; // creates temp_string to hold converted value from file as a string
+		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through stored pixels in the global buffer
+		
+		// while loop which iterates for every pixel in the file using width * height
+		while(i < atoi(header_buffer->file_width) * atoi(header_buffer->file_height))
+	    {
+			sprintf(temp_string, "%d", (*temp_ptr).r); // converts read-in pixel "r" value to a string
+			fprintf(fp, temp_string); // writes converted pixel as a string to the file
+			memset(temp_string, 0, 64); // resets all values in temp to 0 for reuse
+			fprintf(fp, "\n"); // prints a newline to act as "whitespace" between pixel information
+			
+			sprintf(temp_string, "%d", (*temp_ptr).g); // converts read-in pixel "g" value to a string
+			fprintf(fp, temp_string); // writes converted pixel as a string to the file
+			memset(temp_string, 0, 64); // resets all values in temp to 0 for reuse
+			fprintf(fp, "\n"); // prints a newline to act as "whitespace" between pixel information
+			
+			sprintf(temp_string, "%d", (*temp_ptr).b); // converts read-in pixel "b" value to a string	
+			fprintf(fp, temp_string); // writes converted pixel as a string to the file
+			memset(temp_string, 0, 64); // resets all values in temp to 0 for reuse
+			fprintf(fp, "\n"); // prints a newline to act as "whitespace" between pixel information
+				
+			temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+			i++;  // increments iterator variable
+		}
+
+		fclose(fp);
+    }
+	
+	// POTENTIALLY REMOVE
+	// extra error checking in case file format given was invalid, but should have been caught earlier
+	else
+	{
+		fprintf(stderr, "Error: File format to write out not recognized\n");
+		fclose(fp); // closes file before exiting out
+		exit(1); // exits out of program due to error	
+	}
 }
