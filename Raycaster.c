@@ -156,9 +156,9 @@ int main(int argc, char** argv) {
 // currently a test sphere_intersection method
 double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 {
-	double a = sqr(Ro[0]) + sqr(Rd[1]) + sqr(Rd[2]);
-	double b = 2 * (Rd[0] * (Ro[0] - C[0]) + Rd[1] * (Ro[1] - C[1]) + Rd[2] * (Ro[2] - C[2]));
-	double c = sqr(Ro[0] - C[0]) + sqr(Ro[1] - C[1]) + sqr(Ro[2] - C[2]) - sqr(r);
+	double a = sqr(Rd[0]) + sqr(Rd[1]) + sqr(Rd[2]);
+	double b = (2 * (Ro[0] * Rd[0] - Rd[0] * C[0] + Ro[1] * Rd[1] - Rd[1] * C[1] + Ro[2] * Rd[2] - Rd[2] * C[2]));
+	double c = sqr(Ro[0]) - 2*Ro[0]*C[0] + sqr(C[0]) + sqr(Ro[1]) - 2*Ro[1]*C[1] + sqr(C[1]) + sqr(Ro[2]) - 2*Ro[2]*C[2] + sqr(C[2]) - sqr(r);
 	
 	double det = sqr(b) - 4 * a * c;
 	if(det < 0) return -1;
@@ -179,7 +179,20 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 
 double plane_intersection(double* Ro, double* Rd, double* C, double* n)
 {
-	double t = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) / ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
+	//double t = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) / ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
+	
+	
+	double Vd = ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
+	if(Vd == 0) 
+	{
+		printf("Parallel ray so no intersection.\n");
+		return -1;
+	}
+	// else potentially intersect?
+	double Vo = ((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2]));
+	
+	double t = Vo/Vd;
+		
 	if(t > 0) 
 	{
 		printf("Found a plane intersection.\n");
@@ -217,11 +230,15 @@ void raycasting() // go back and add function prototype
 		//temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
 		
 		
+		//double cx = 0;
+		//double cy = 0;
+		
 		double cx = 0;
 		double cy = 0;
 		
-		int M = 25; // change?
-		int N = 25; // change?
+		int M = 20; // change?
+		int N = 20; // change?
+		// ERROR CHECK M & N AGAINS WIDTH X HEIGHT FROM CMD LINE (set them equal to cmd line parameters?
 		
 		double pixheight = glob_height / M;
 		double pixwidth = glob_width / N;
@@ -639,13 +656,7 @@ void write_image_data(char* output_file_name)
 {
 	FILE *fp;
 	
-	printf("About to try opening file\n");
-	
 	fp = fopen(output_file_name, "a"); // opens file to be appended to (file will be created if one does not exist)
-	if(!fp) printf("NOT fp\n");
-	else{printf("YES fp\n");}
-	
-	printf("Opened file.\n");
 	
 	if(fp == NULL) 
 	{
