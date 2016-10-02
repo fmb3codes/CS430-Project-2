@@ -177,6 +177,7 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 	return -1;
 }
 
+//CAPITALIZE n
 double plane_intersection(double* Ro, double* Rd, double* C, double* n)
 {
 	//double t = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) / ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
@@ -185,17 +186,17 @@ double plane_intersection(double* Ro, double* Rd, double* C, double* n)
 	double Vd = ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
 	if(Vd == 0) 
 	{
-		printf("Parallel ray so no intersection.\n");
+		//printf("Parallel ray so no intersection.\n");
 		return -1;
 	}
 	// else potentially intersect?
-	double Vo = ((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2]));
+	double Vo = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) + 1;
 	
 	double t = Vo/Vd;
 		
 	if(t > 0) 
 	{
-		printf("Found a plane intersection.\n");
+		//printf("Found a plane intersection.\n");
 		return t;
 	}
 	//printf("Didn't find a plane intersection.\n");
@@ -236,8 +237,8 @@ void raycasting() // go back and add function prototype
 		double cx = 0;
 		double cy = 0;
 		
-		int M = 20; // change?
-		int N = 20; // change?
+		int M = atoi(header_buffer->file_height); // change?
+		int N = atoi(header_buffer->file_width); // change?
 		// ERROR CHECK M & N AGAINS WIDTH X HEIGHT FROM CMD LINE (set them equal to cmd line parameters?
 		
 		double pixheight = glob_height / M;
@@ -272,18 +273,24 @@ void raycasting() // go back and add function prototype
 							t = sphere_intersection(Ro, Rd,
 														objects[i]->sphere.position,
 														objects[i]->sphere.radius);
+														
+							if (t > 0) { // color current_pixel only if an intersection was found
 						    current_pixel.r = objects[i]->color[0];
 							current_pixel.g = objects[i]->color[1];
 							current_pixel.b = objects[i]->color[2];
+							}
+							
 							break;
 						case 2:
 							//printf("Plane intersect not implemented yet\n");
 							t = plane_intersection(Ro, Rd,
 														objects[i]->plane.position,
 														objects[i]->plane.normal);
+							if (t > 0) {
 						    current_pixel.r = objects[i]->color[0];
 							current_pixel.g = objects[i]->color[1];
 							current_pixel.b = objects[i]->color[2];
+							}
 							break;
 						default:
 						// Horrible error -> FLESH out
@@ -293,8 +300,12 @@ void raycasting() // go back and add function prototype
 					}
 					if (best_t > 0 && best_t != INFINITY) {
 						//printf("Got a hit, coloring pixel non-white.\n");
+						//printf("Final coloring is: r - %d, g - %d, b - %d\n", current_pixel.r, current_pixel.g, current_pixel.b);
 						*temp_ptr = current_pixel; // effectively stores current pixel in temporary buffer
 						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+						current_pixel.r = 255;
+						current_pixel.g = 255; // resets current pixel RGB values to 255 after coloring current pixel
+						current_pixel.b = 255;
 						printf("#");
 					} else {
 						//printf("Didn't hit, coloring white.");
