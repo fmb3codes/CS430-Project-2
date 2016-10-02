@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
   return 0;
 }
 
-// currently a test sphere_intersection method
+// function which takes in an origin ray, direction of the ray, position of the sphere object, and radius of the sphere object and determines if there's an intersection at the current point
 double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 {
 	double a = sqr(Rd[0]) + sqr(Rd[1]) + sqr(Rd[2]);
@@ -177,20 +177,20 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 	return -1;
 }
 
-//CAPITALIZE n
-double plane_intersection(double* Ro, double* Rd, double* C, double* n)
+// function which takes in an origin ray, direction of the ray, position of the plane object, and normal of the plane object and determines if there's an intersection at the current point
+double plane_intersection(double* Ro, double* Rd, double* C, double* N)
 {
 	//double t = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) / ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
 	
 	
-	double Vd = ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
+	double Vd = ((N[0] * Rd[0]) + (N[1] * Rd[1]) + (N[2] * Rd[2]));
 	if(Vd == 0) 
 	{
 		//printf("Parallel ray so no intersection.\n");
 		return -1;
 	}
 	// else potentially intersect?
-	double Vo = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) + 1;
+	double Vo = -((N[0] * Ro[0]) + (N[1] * Ro[1]) + (N[2] * Ro[2])) + 1;
 	
 	double t = Vo/Vd;
 		
@@ -508,7 +508,7 @@ void read_scene(char* filename) {
   while (1) {
     c = fgetc(json);
     if (c == ']') {
-      fprintf(stderr, "Error: This is the worst scene file EVER.\n");
+      fprintf(stderr, "Error: Empty Scene File.\n");
       fclose(json);
       return;
     }
@@ -518,8 +518,8 @@ void read_scene(char* filename) {
       // Parse the object
       char* key = next_string(json);
       if (strcmp(key, "type") != 0) {
-	fprintf(stderr, "Error: Expected \"type\" key on line number %d.\n", line);
-	exit(1);
+		fprintf(stderr, "Error: Expected \"type\" key on line number %d.\n", line);
+		exit(1);
       }
 
       skip_ws(json);
@@ -559,14 +559,14 @@ void read_scene(char* filename) {
       skip_ws(json);
 
       while (1) {
-	// , }
-	c = next_c(json);
-	if (c == '}') {
-	  // stop parsing this object
-	  printf("Finished parsing object so incrementing iterator. Before increment: %d\n", i);
-	  i++;
-	  break;
-	} else if (c == ',') {
+	  // , }
+	  c = next_c(json);
+	  if (c == '}') {
+	    // stop parsing this object
+	    //printf("Finished parsing object so incrementing iterator. Before increment: %d\n", i);
+	    i++;
+	    break;
+	  } else if (c == ',') {
 	  // read another field
 	  skip_ws(json);
 	  char* key = next_string(json);
@@ -581,13 +581,13 @@ void read_scene(char* filename) {
 		{
 			printf("Currently assigning width: %f.\n", value);
 			objects[i]->camera.width = value;
-			glob_width = value;
+			glob_width = value; // stores camera width to prevent need to iterate through objects later
 		}
 		else if(strcmp(key, "height") == 0)
 		{
 			printf("Currently assigning height %f.\n", value);
-			objects[i]->camera.height = value;
-			glob_height = value;
+			objects[i]->camera.height = value; 
+			glob_height = value; // stores camera height to prevent need to iterate through objects later
 		}
 		else
 		{
@@ -602,6 +602,7 @@ void read_scene(char* filename) {
 		if(strcmp(key, "color") == 0)
 		{
 			printf("Currently assigning colors [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
+			// ERROR CHECK FOR COLOR VALUE > 0 AND < 256
 			objects[i]->color[0] = value[0];
 			objects[i]->color[1] = value[1];
 			objects[i]->color[2] = value[2];
@@ -640,25 +641,30 @@ void read_scene(char* filename) {
 	  }
 	  skip_ws(json);
 	} else {
-	  fprintf(stderr, "Error: Unexpected value on line %d\n", line);
-	  exit(1);
+		fprintf(stderr, "Error: Unexpected value on line %d. Expected either ',' or '}' to indicate next field or end of object.\n", line);
+		exit(1);
 	}
       }
       skip_ws(json);
       c = next_c(json);
-      if (c == ',') {
-	// noop
-	skip_ws(json);
+      if (c == ',') { // Should be followed by another object
+		// noop
+		skip_ws(json);
       } else if (c == ']') {
-	printf("Reached end of objects so null-terminating and current index is: %d.\n", i);
-	objects[i] = NULL; // null-terminate after last object
-	fclose(json);
-	return;
+			//printf("Reached end of objects so null-terminating and current index is: %d.\n", i);
+			objects[i] = NULL; // null-terminate after last object
+			fclose(json);
+			return;
       } else {
-	fprintf(stderr, "Error: Expecting ',' or ']' on line %d.\n", line);
-	exit(1);
+			fprintf(stderr, "Error: Expecting ',' or ']' on line %d.\n", line);
+			exit(1);
       }
     }
+    else // didn't find end of file or the beginning of an object
+	{
+		fprintf(stderr, "Error: Expecting '{' or ']' on line %d.\n", line);
+		exit(1);
+	}
   }
 }
 
