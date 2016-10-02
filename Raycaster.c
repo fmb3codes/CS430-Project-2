@@ -36,6 +36,8 @@ void raycasting();
 
 double sphere_intersection(double* Ro, double* Rd, double* C, double r);
 
+double plane_intersection(double* Ro, double* Rd, double* C, double* n);
+
 double sqr(double v);
 
 void write_image_data(char* output_file_name);
@@ -132,15 +134,21 @@ int main(int argc, char** argv) {
   raycasting();
   printf("Done raycasting and determining pixel colors, now writing to file...\n");
   
-  // testing code to delete file in order to prevent data overflow
+   // testing code to delete file in order to prevent data overflow
   FILE* test_fp = fopen(output_file, "r");
-  if(test_fp != NULL) remove(output_file);
+  //printf("Output file name is: %s\n", output_file);
+  if(test_fp != NULL) 
+  {
+	fclose(test_fp);
+	remove(output_file);
+  }
   else if(test_fp == NULL) printf("File doesn't exist\n");
   // end of testing code
   
+  // ADD ERROR CHECKING FOR RIGHT COLOR VALUE (NOT > MAXCOLOR OR <)
   
   write_image_data(output_file);
-  
+  printf("Done writing!\n");
   
   return 0;
 }
@@ -149,8 +157,8 @@ int main(int argc, char** argv) {
 double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 {
 	double a = sqr(Ro[0]) + sqr(Rd[1]) + sqr(Rd[2]);
-	double b = (2 * Rd[0] * (Ro[0] - C[0])) + (2 * Rd[1] * (Ro[1] - C[1])) + (2 * Rd[2] * (Ro[2] - C[2]));
-	double c = sqr(C[0]) + sqr(C[1]) + sqr(C[2]) + sqr(Ro[0]) + sqr(Ro[1]) + sqr(Ro[2]) + (-2 * ((C[0] * Ro[0]) + (C[1] * Ro[1]) + (C[2] * Ro[2]))) - sqr(r);
+	double b = 2 * (Rd[0] * (Ro[0] - C[0]) + Rd[1] * (Ro[1] - C[1]) + Rd[2] * (Ro[2] - C[2]));
+	double c = sqr(Ro[0] - C[0]) + sqr(Ro[1] - C[1]) + sqr(Ro[2] - C[2]) - sqr(r);
 	
 	double det = sqr(b) - 4 * a * c;
 	if(det < 0) return -1;
@@ -169,9 +177,15 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 	return -1;
 }
 
-double plane_intersection(double* Ro, double* Rd, double* C, double n)
+double plane_intersection(double* Ro, double* Rd, double* C, double* n)
 {
-	double p = 0;
+	double t = -((n[0] * Ro[0]) + (n[1] * Ro[1]) + (n[2] * Ro[2])) / ((n[0] * Rd[0]) + (n[1] * Rd[1]) + (n[2] * Rd[2]));
+	if(t > 0) 
+	{
+		printf("Found a plane intersection.\n");
+		return t;
+	}
+	//printf("Didn't find a plane intersection.\n");
 	
 	return -1;
 }
@@ -206,11 +220,14 @@ void raycasting() // go back and add function prototype
 		double cx = 0;
 		double cy = 0;
 		
-		int M = 20; // change?
-		int N = 20; // change?
+		int M = 25; // change?
+		int N = 25; // change?
 		
 		double pixheight = glob_height / M;
 		double pixwidth = glob_width / N;
+
+		
+		printf("Global height is: %lf and width is: %lf.", glob_height, glob_width);
 		
 		printf("pixheight is: %lf and pixwidth is: %lf\n", pixheight, pixwidth);
 		
@@ -244,6 +261,12 @@ void raycasting() // go back and add function prototype
 							break;
 						case 2:
 							//printf("Plane intersect not implemented yet\n");
+							t = plane_intersection(Ro, Rd,
+														objects[i]->plane.position,
+														objects[i]->plane.normal);
+						    current_pixel.r = objects[i]->color[0];
+							current_pixel.g = objects[i]->color[1];
+							current_pixel.b = objects[i]->color[2];
 							break;
 						default:
 						// Horrible error -> FLESH out
@@ -252,10 +275,12 @@ void raycasting() // go back and add function prototype
 						if (t > 0 && t < best_t) best_t = t;
 					}
 					if (best_t > 0 && best_t != INFINITY) {
+						//printf("Got a hit, coloring pixel non-white.\n");
 						*temp_ptr = current_pixel; // effectively stores current pixel in temporary buffer
 						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
 						printf("#");
 					} else {
+						//printf("Didn't hit, coloring white.");
 						current_pixel.r = 255;
 						current_pixel.g = 255; // resets current pixel RGB values to 255 since current_pixel is not colored (non-white in this case)
 						current_pixel.b = 255;
@@ -614,7 +639,13 @@ void write_image_data(char* output_file_name)
 {
 	FILE *fp;
 	
+	printf("About to try opening file\n");
+	
 	fp = fopen(output_file_name, "a"); // opens file to be appended to (file will be created if one does not exist)
+	if(!fp) printf("NOT fp\n");
+	else{printf("YES fp\n");}
+	
+	printf("Opened file.\n");
 	
 	if(fp == NULL) 
 	{
