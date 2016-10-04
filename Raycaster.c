@@ -313,15 +313,14 @@ void raycasting()
 						current_pixel.b = 0;
 					} else { // no dominant intersection found at current point so pixel is to be colored black
 						current_pixel.r = 0;
-						current_pixel.g = 0; // resets current pixel RGB values to 0 since current_pixel is not colored (non-white in this case)
+						current_pixel.g = 0; // colors current pixel RGB values to 0 since no intersection was found
 						current_pixel.b = 0;		
 						*temp_ptr = current_pixel;  // sets current image_data struct in temp_ptr to current_pixel colored from object 
 						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
 					}
      
 			}			
-			printf("\n");
-			}	
+	}	
 		return;
 }
 
@@ -379,8 +378,7 @@ void print_objects()
 	}
 }
 
-// next_c() wraps the getc() function and provides error checking and line
-// number maintenance
+// next_c() wraps the getc() function and provides error checking and line number maintenance
 int next_c(FILE* json) {
   int c = fgetc(json);
 #ifdef DEBUG
@@ -397,8 +395,7 @@ int next_c(FILE* json) {
 }
 
 
-// expect_c() checks that the next character is d.  If it is not it emits
-// an error.
+// expect_c() checks that the next character is d.  If it is not it emits an error.
 void expect_c(FILE* json, int d) {
   int c = next_c(json);
   if (c == d) return;
@@ -417,8 +414,7 @@ void skip_ws(FILE* json) {
 }
 
 
-// next_string() gets the next string from the file handle and emits an error
-// if a string can not be obtained.
+// next_string() gets the next string from the file handle and emits an error if a string can not be obtained.
 char* next_string(FILE* json) {
   char buffer[129];
   int c = next_c(json);
@@ -466,28 +462,26 @@ double* next_vector(FILE* json) {
   expect_c(json, '[');
   skip_ws(json);
   v[0] = next_number(json);
-  printf("Read in number (vector) is: %lf.\n", v[0]);
   skip_ws(json);
   expect_c(json, ',');
   skip_ws(json);
   v[1] = next_number(json);
-  printf("Read in number (vector) is: %lf.\n", v[1]);
   skip_ws(json);
   expect_c(json, ',');
   skip_ws(json);
   v[2] = next_number(json);
-  printf("Read in number (vector) is: %lf.\n", v[2]);
   skip_ws(json);
   expect_c(json, ']');
   return v;
 }
 
-
+// function which parses information from given json input file
 void read_scene(char* filename) {
   int c;
   FILE* json = fopen(filename, "r");
 
-  if (json == NULL) {
+  if (json == NULL) 
+  {
     fprintf(stderr, "Error: Could not open file \"%s\"\n", filename);
     exit(1);
   }
@@ -498,27 +492,31 @@ void read_scene(char* filename) {
   expect_c(json, '[');
 
   skip_ws(json);
-
-  int i = 0;
   
   // Find the objects
-  
    c = fgetc(json);
-   if (c == ']') {
+   if (c == ']')  // Quick check to see if there is an empty json file; displays an error accordingly
+   { 
       fprintf(stderr, "Error: Empty Scene File.\n");
       fclose(json);
       exit(1);
     }
-   ungetc(c, json);
+   ungetc(c, json); // ungets c after checking immediately for end of json file indicator (']')
+   
+   int i = 0; // iterator variable for objects
 
-   while (1) {
+   // while loop intended to parse through all objects
+   while (1) 
+   {
     c = fgetc(json);
-    if (c == '{') {
+    if (c == '{') 
+	{
       skip_ws(json);
     
       // Parse the object
       char* key = next_string(json);
-      if (strcmp(key, "type") != 0) {
+      if (strcmp(key, "type") != 0) 
+	  {
 		fprintf(stderr, "Error: Expected \"type\" key on line number %d.\n", line);
 		exit(1);
       }
@@ -531,78 +529,88 @@ void read_scene(char* filename) {
 
       char* value = next_string(json);
 
-      if (strcmp(value, "camera") == 0) {
+      if (strcmp(value, "camera") == 0) 
+	  { // allocates memory for camera object and stores the "kind" as corresponding number
 		  objects[i] = malloc(sizeof(Object));
 		  objects[i]->kind = 0;
 		  
 		  
-      } else if (strcmp(value, "sphere") == 0) {
+      } 
+	  else if (strcmp(value, "sphere") == 0) 
+	  { // allocates memory for sphere object and stores the "kind" as corresponding number
 		  objects[i] = malloc(sizeof(Object));
 		  objects[i]->kind = 1;
 		  
 		  
-      } else if (strcmp(value, "plane") == 0) {
+      } 
+	  else if (strcmp(value, "plane") == 0) 
+	  { // allocates memory for plane object and stores the "kind" as corresponding number
 		  objects[i] = malloc(sizeof(Object));
 		  objects[i]->kind = 2;
 
 		  
-      } else {
+      } 
+	  else 
+	  { // unknown object was read in so an error is displayed
 		fprintf(stderr, "Error: Unknown object type, \"%s\", on line number %d.\n", value, line);
 		exit(1);
       }
 
       skip_ws(json);
 
-      while (1) {
+	 // while loop intended to parse through the fields a single object after guaranteed first field "type"
+     while (1) 
+	 {
 	  // , }
 	  c = next_c(json);
-	  if (c == '}') {
+	  if (c == '}') 
+	  {
 	    // stop parsing this object
 	    i++;
 	    break;
-	  } else if (c == ',') {
+	  } 
+	  else if (c == ',') 
+	  {
 	  // read another field
 	  skip_ws(json);
 	  char* key = next_string(json);
 	  skip_ws(json);
 	  expect_c(json, ':');
 	  skip_ws(json);
-	  if ((strcmp(key, "width") == 0) ||
-	      (strcmp(key, "height") == 0) ||
-	      (strcmp(key, "radius") == 0)) {
+	  if ((strcmp(key, "width") == 0) || 
+	      (strcmp(key, "height") == 0) || // evaluates if field is either a width/height/radius
+	      (strcmp(key, "radius") == 0)) 
+	  {
 	    double value = next_number(json);
-		if(strcmp(key, "width") == 0 && objects[i]->kind == 0)
+		if(strcmp(key, "width") == 0 && objects[i]->kind == 0) // evaluates only if key is width and current object is a camera
 		{
-			printf("Currently assigning width: %f.\n", value);
 			objects[i]->camera.width = value;
 			glob_width = value; // stores camera width to prevent need to iterate through objects later
 		}
-		else if(strcmp(key, "height") == 0 && objects[i]-> kind == 0)
+		else if(strcmp(key, "height") == 0 && objects[i]-> kind == 0) // evaluates only if key is height and current object is a camera
 		{
-			printf("Currently assigning height %f.\n", value);
 			objects[i]->camera.height = value; 
 			glob_height = value; // stores camera height to prevent need to iterate through objects later
 		}
-		else if(strcmp(key, "radius") == 0 && objects[i]-> kind == 1)
+		else if(strcmp(key, "radius") == 0 && objects[i]-> kind == 1) // evaluates only if key is radius and current object is a sphere
 		{
-			printf("Currently assigning radius %f.\n", value);
 			objects[i]->sphere.radius = value;
 		}
-		else
+		else // after key was identified as width/height/radius, object type is unknown so display an error
 		{
 			fprintf(stderr, "Error: Only cameras should have width/height and spheres have radius. Violation found on line number %d.\n", line);
             exit(1);
 		}
 		
-	  } else if ((strcmp(key, "color") == 0) ||
-		     (strcmp(key, "position") == 0) ||
-		     (strcmp(key, "normal") == 0)) { // do additional error checking with color
+	  } 
+	  else if ((strcmp(key, "color") == 0) ||
+		     (strcmp(key, "position") == 0) || // evaluates if field is either a color/position/normal
+		     (strcmp(key, "normal") == 0)) 
+	  { 
 	    double* value = next_vector(json);
-		if((strcmp(key, "color") == 0 && objects[i]->kind == 1) || (strcmp(key, "color") == 0 && objects[i]->kind == 2))
+		if((strcmp(key, "color") == 0 && objects[i]->kind == 1) || (strcmp(key, "color") == 0 && objects[i]->kind == 2)) // evaluates only if key is color and current object is a sphere or plane
 		{
-			printf("Currently assigning colors [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
-
-			int j = 0;
+			int j = 0; // iterator variable for error-checking
 			for(j = 0; j < 3; j+=1) // error checking for loop to make sure color values from object are between 0 and 1 (inclusive)
 			{
 				if(value[j] < 0 || value[j] > 1) // assuming color value must be between 0 and 1 (inclusive) due to example json file given along with corresponding ppm output file indicating so
@@ -612,60 +620,67 @@ void read_scene(char* filename) {
 				}
 			}
 			objects[i]->color[0] = value[0];
-			objects[i]->color[1] = value[1];
+			objects[i]->color[1] = value[1]; // assigns color values from value vector to current object 
 			objects[i]->color[2] = value[2];
 		}
-		else if((strcmp(key, "position") == 0 && objects[i]->kind == 1) || ((strcmp(key, "position") == 0 && objects[i]->kind == 2)))
+		else if((strcmp(key, "position") == 0 && objects[i]->kind == 1) || ((strcmp(key, "position") == 0 && objects[i]->kind == 2))) // evaluates only if key is position and current object is a sphere or plane
 		{
-			printf("Currently assigning position [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			if(objects[i]->kind == 1)
 			{
 				objects[i]->sphere.position[0] = value[0];
-				objects[i]->sphere.position[1] = -value[1];
+				objects[i]->sphere.position[1] = -value[1]; // assigns position values from value vector to current sphere object 
 				objects[i]->sphere.position[2] = value[2];
 			}
 			else if(objects[i]->kind == 2)
 			{
 				objects[i]->plane.position[0] = value[0];
-				objects[i]->plane.position[1] = value[1];
+				objects[i]->plane.position[1] = value[1]; // assigns position values from value vector to current plane object 
 				objects[i]->plane.position[2] = value[2];
 			}
-			else
+			else // Evaluates if there is a mismatched object field with sphere/plane and position, but should never happen
 			{
 				fprintf(stderr, "Error: Mismatched object field, on line %d.\n", key, line);
 			}
 		}
-		else if(strcmp(key, "normal") == 0 && objects[i]->kind == 2)
+		else if(strcmp(key, "normal") == 0 && objects[i]->kind == 2) // evaluates only if key is normal and current object is a plane
 		{
-			printf("Currently assigning normal [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			objects[i]->plane.normal[0] = value[0];
-			objects[i]->plane.normal[1] = value[1];
+			objects[i]->plane.normal[1] = value[1]; // assigns normal values from value vector to current plane object 
 			objects[i]->plane.normal[2] = value[2];
 		}
-		else
+		else // after key was identified as color/position/normal, object type is unknown so display an error
 		{
 			fprintf(stderr, "Error: Only spheres and planes should have color/position and only planes should have a normal. Violation found on line number %d.\n", line);
             exit(1);
 		}
-	  } else {
+	  } 
+	  else // unknown field was read in so display an error
+	  { 
 	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n", key, line);
 	  }
 	  skip_ws(json);
-	} else {
+	  } 
+	  else  // expecting either a new field or the end of an object so display an error
+	  {
 		fprintf(stderr, "Error: Unexpected value on line %d. Expected either ',' or '}' to indicate next field or end of object.\n", line);
 		exit(1);
-	}
-      }
+	  }
+     }
       skip_ws(json);
       c = next_c(json);
-      if (c == ',') { // Should be followed by another object
+      if (c == ',') // Should be followed by another object
+	  { 
 		// noop
 		skip_ws(json);
-      } else if (c == ']') {
+      } 
+	  else if (c == ']')  // reached end of json file
+	  {
 			objects[i] = NULL; // null-terminate after last object
 			fclose(json);
 			return;
-      } else {
+      } 
+	  else // finished parsing an object and a comma or hard bracket was expect to indicate a new object/end of object list, so display error
+	  {
 			fprintf(stderr, "Error: Expecting ',' or ']' on line %d.\n", line);
 			exit(1);
       }
