@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
 	header_buffer->file_maxcolor = (char *)malloc(100);
   
 	// block of code which hardcodes file format to be read out and also stores height/width from command line. Max color value is set at 255 as well
-	strcpy(header_buffer->file_format, "P3");
+	strcpy(header_buffer->file_format, "P6");
 	sprintf(header_buffer->file_height, "%d", height);
 	sprintf(header_buffer->file_width, "%d", width);
 	sprintf(header_buffer->file_maxcolor, "%d", 255);
@@ -158,23 +158,10 @@ int main(int argc, char** argv) {
 	image_buffer = (image_data *)malloc(sizeof(image_data) * width * height + 1); // allocates memory for image based on width * height of image as given by command line
   
 	read_scene(input_file); // parses json input file
-	print_objects();
+	
 	raycasting(); // executes raycasting based on information read in from json file in conjunction with the global image_buffer which handles the image pixels
-    
-	// testing code to delete file in order to prevent data overflow
-	FILE* test_fp = fopen(output_file, "r");
-	//printf("Output file name is: %s\n", output_file);
-	if(test_fp != NULL) 
-	{
-		fclose(test_fp);
-		remove(output_file);
-	}
-	else if(test_fp == NULL) printf("File doesn't exist\n");
-	// end of testing code
-
-  
-	write_image_data(output_file);
-	printf("Finished writing .ppm file!\n");
+ 
+	write_image_data(output_file); // writes "colored" pixels to ppm file after raycasting
   
 	return 0;
 }
@@ -200,16 +187,16 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 	double c = sqr(Ro[0]) - 2*Ro[0]*C[0] + sqr(C[0]) + sqr(Ro[1]) - 2*Ro[1]*C[1] + sqr(C[1]) + sqr(Ro[2]) - 2*Ro[2]*C[2] + sqr(C[2]) - sqr(r);
 		
 	double det = sqr(b) - 4 * a * c;
-	if(det < 0) return -1;
+	if(det < 0) return -1; // if determinant is negative then there's no sphere intersection so return -1
 	
 	det = sqrt(det);
 	
 	double t0 = (-b - det) / (2 * a);
-	if(t0 > 0) return t0;
+	if(t0 > 0) return t0; // t0 indicates a sphere intersection so return it
 	double t1 = (-b + det) / (2 * a);
-	if(t1 > 0) return t1;
+	if(t1 > 0) return t1; // t1 indicates a sphere intersection so return it
 	
-	return -1;
+	return -1; // didn't find a sphere intersection so return -1
 }
 
 // function which takes in an origin ray, direction of the ray, position of the plane object, and normal of the plane object and determines if there's an intersection at the current point
@@ -448,7 +435,7 @@ char* next_string(FILE* json) {
 // function which reads next number from file, wrapped around error checking if nothing is read in
 double next_number(FILE* json) {
   double value;
-  if(fscanf(json, "%lf", &value) == 0)
+  if(fscanf(json, "%lf", &value) == 0) // error checking to make sure fscanf read in a number; will only evaluate if fscanf didn't read anything in and returned 0
   {
 	  fprintf(stderr, "Error: Expected a number on line %d.\n", line);
       exit(1);	
@@ -693,7 +680,7 @@ void read_scene(char* filename) {
   }
 }
 
-// write_image_data function takes in the output_file_name to know where to open the file
+// write_image_data function takes in the output_file_name to know where to write out to
 void write_image_data(char* output_file_name)
 {
 	FILE *fp;
@@ -706,8 +693,6 @@ void write_image_data(char* output_file_name)
 		exit(1); // exits out of program due to error
 	}
 	
-	char* current_line;
-	
 	// block of code which writes header information into the output file along with whitespaces accordingly
 	fprintf(fp, header_buffer->file_format); 
 	fprintf(fp, "\n");
@@ -718,64 +703,22 @@ void write_image_data(char* output_file_name)
 	fprintf(fp, header_buffer->file_maxcolor);
 	fprintf(fp, "\n");
 	
-	// strcmp to check for type of input file format -> will always be P3 in this case
-	if(strcmp(header_buffer->file_format, "P3") == 0)
-	{		
-		int i = 0; // initializes iterator variable
-		unsigned char temp[64] = {0}; // creates temp array of unsigned char
-		char temp_string[64]; // creates temp_string to hold converted value from file as a string
-		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through stored pixels in the global buffer
+	// Writing of P6 data (as recommended by professor) starts here
+	fclose(fp); // closes file after writing header information since P6 requires writing bytes
+	fopen(output_file_name, "ab"); // opens file to be appended to in byte mode
+	int i = 0; // initializes iterator variable
+	image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through stored pixels in the global buffer
 		
-		// while loop which iterates for every pixel in the file using width * height
-		while(i < atoi(header_buffer->file_width) * atoi(header_buffer->file_height))
-	    {
-			sprintf(temp_string, "%d", (*temp_ptr).r); // converts read-in pixel "r" value to a string
-			fprintf(fp, temp_string); // writes converted pixel as a string to the file
-			memset(temp_string, 0, 64); // resets all values in temp to 0 for reuse
-			fprintf(fp, "\n"); // prints a newline to act as "whitespace" between pixel information
-			
-			sprintf(temp_string, "%d", (*temp_ptr).g); // converts read-in pixel "g" value to a string
-			fprintf(fp, temp_string); // writes converted pixel as a string to the file
-			memset(temp_string, 0, 64); // resets all values in temp to 0 for reuse
-			fprintf(fp, "\n"); // prints a newline to act as "whitespace" between pixel information
-			
-			sprintf(temp_string, "%d", (*temp_ptr).b); // converts read-in pixel "b" value to a string	
-			fprintf(fp, temp_string); // writes converted pixel as a string to the file
-			memset(temp_string, 0, 64); // resets all values in temp to 0 for reuse
-			fprintf(fp, "\n"); // prints a newline to act as "whitespace" between pixel information
-				
-			temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
-			i++;  // increments iterator variable
-		}
-
-		fclose(fp);
-    }
-	else if(strcmp(header_buffer->file_format, "P6") == 0)
+	// while loop which iterates for every pixel in the file using width * height
+	while(i != atoi(header_buffer->file_width) * atoi(header_buffer->file_height))
 	{
-		fclose(fp); // closes file after writing header information since P6 requires writing bytes
-		fopen(output_file_name, "ab"); // opens file to be appended to in byte mode
-		int i = 0; // initializes iterator variable
-		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through stored pixels in the global buffer
-		
-		// while loop which iterates for every pixel in the file using width * height
-		while(i != atoi(header_buffer->file_width) * atoi(header_buffer->file_height))
-	    {
-			fwrite(&(*temp_ptr).r, sizeof(unsigned char), 1, fp); // writes the current pixels "r" value of an "unsigned char" byte to the file
-			fwrite(&(*temp_ptr).g, sizeof(unsigned char), 1, fp); // writes the current pixels "g" value of an "unsigned char" byte to the file
-			fwrite(&(*temp_ptr).b, sizeof(unsigned char), 1, fp); // writes the current pixels "b" value of an "unsigned char" byte to the file
+		fwrite(&(*temp_ptr).r, sizeof(unsigned char), 1, fp); // writes the current pixels "r" value of an "unsigned char" byte to the file
+		fwrite(&(*temp_ptr).g, sizeof(unsigned char), 1, fp); // writes the current pixels "g" value of an "unsigned char" byte to the file
+		fwrite(&(*temp_ptr).b, sizeof(unsigned char), 1, fp); // writes the current pixels "b" value of an "unsigned char" byte to the file
 				
-			temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
-			i++;  // increments iterator variable
-		}
+		temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+		i++;  // increments iterator variable
+	}
 		
-		fclose(fp);
-	}
-	
-	// extra error checking in case file format given was invalid, but should have been caught earlier
-	else
-	{
-		fprintf(stderr, "Error: File format to write out not recognized\n");
-		fclose(fp); // closes file before exiting out
-		exit(1); // exits out of program due to error	
-	}
+	fclose(fp);
 }
