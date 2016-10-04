@@ -42,6 +42,8 @@ double sqr(double v);
 
 void write_image_data(char* output_file_name);
 
+void print_pixels(); // find way to move this
+
 
 // object struct typedef'd as Object intended to hold any of the specified objects in the given scene (.json) file
 typedef struct {
@@ -93,7 +95,6 @@ Object** objects;
 double glob_width = 0; // global width, intended to store camera width
 double glob_height = 0; // global height, intended to store camera height
 
-void print_pixels(); // find way to move this
 
 int main(int argc, char** argv) {
 	
@@ -135,6 +136,7 @@ int main(int argc, char** argv) {
 	}
 	// end of .json/.ppm extension error checking	
   
+  
 	objects = malloc(sizeof(Object*)*129); // allocates memory for global object buffer to maximally account for 128 objects
   
 	// block of code allocating memory to global header_buffer before its use
@@ -155,14 +157,9 @@ int main(int argc, char** argv) {
 	// image_buffer memory allocation here
 	image_buffer = (image_data *)malloc(sizeof(image_data) * width * height + 1); // allocates memory for image based on width * height of image as given by command line
   
-	read_scene(input_file);
-	printf("Finished parsing!\n");
+	read_scene(input_file); // parses json input file
 	print_objects();
-	//print_pixels();
-	printf("About to start raycasting...\n");
-	raycasting();
-	printf("Done raycasting and determining pixel colors, now writing to file...\n");
-	//print_pixels();
+	raycasting(); // executes raycasting based on information read in from json file in conjunction with the global image_buffer which handles the image pixels
     
 	// testing code to delete file in order to prevent data overflow
 	FILE* test_fp = fopen(output_file, "r");
@@ -174,11 +171,10 @@ int main(int argc, char** argv) {
 	}
 	else if(test_fp == NULL) printf("File doesn't exist\n");
 	// end of testing code
-  
-	// ADD ERROR CHECKING FOR RIGHT COLOR VALUE (NOT > MAXCOLOR OR <)
+
   
 	write_image_data(output_file);
-	printf("Finished writing!\n");
+	printf("Finished writing .ppm file!\n");
   
 	return 0;
 }
@@ -247,44 +243,48 @@ void raycasting()
 		current_pixel.g = 0; // initializes current pixel RGB values to 0 (black)
 		current_pixel.b = 0;
 		
+		// sets cx and cy values of camera (assumed to be at 0, 0
 		double cx = 0;
 		double cy = 0;
 		
+		// sets width and height of image based on given width/height from command line that was previously stored in the global header buffer
 		int M = atoi(header_buffer->file_height); 
 		int N = atoi(header_buffer->file_width); 
 		
+		// sets pixheight and pixwidth using M and N declared above as well as camera height/width stored in global variables glob_height/glob_width during json parsing 
 		double pixheight = glob_height / M;
 		double pixwidth = glob_width / N;
 				
-		double Ro[3] = {0, 0, 0};
-		double Rd[3] = {0, 0, 0};
-		double ray[3] = {0, 0, 1};
+		double Ro[3] = {0, 0, 0}; // Initializes origin ray to the assumed 0, 0, 0 position
+		double Rd[3] = {0, 0, 0}; // Initializes direction of ray to 0, 0, 0 which will be changed
+		double ray[3] = {0, 0, 1}; // Initializes temporary ray with 0, 0 for the x and y values and 1 for the assumed z value position
 		
 		
 		for (int y = 0; y < M; y += 1) {
-			ray[1] = (cy - (glob_height/2) + pixheight * (y + 0.5));
+			ray[1] = (cy - (glob_height/2) + pixheight * (y + 0.5)); // calculates y-position of ray and stores accordingly
 			for (int x = 0; x < N; x += 1) {
-				ray[0] = cx - (glob_width/2) + pixwidth * (x + 0.5);
+				ray[0] = cx - (glob_width/2) + pixwidth * (x + 0.5); // calculates x-position of ray and stores accordingly
+				// stores the calculated ray values along with the assumed z value of 1 into the Rd vector
 				Rd[0] = ray[0];
 				Rd[1] = ray[1];
 				Rd[2] = ray[2];
-				normalize(Rd);
+				normalize(Rd); // normalizes the Rd vector
 
 					double best_t = INFINITY;
 					int best_i = 0;
-					for (int i=0; objects[i] != 0; i += 1) {
-						double t = 0;
+					for (int i=0; objects[i] != 0; i += 1) { // iterates through objects
+						double t = 0; // sets t value to 0 before evaluating objects
 
-						switch(objects[i]->kind) {
-						case 0:
-							break;
-						case 1:
+						switch(objects[i]->kind) { // switch statement used to check object type and intersection information accordingly
+						case 0: // object is a camera so break
+							break; 
+						case 1: // object is a sphere so calculate sphere intersection
 							t = sphere_intersection(Ro, Rd,
 														objects[i]->sphere.position,
 														objects[i]->sphere.radius);	
 							
 							break;
-						case 2:
+						case 2: // object is a plane so calculate plane intersection
 							t = plane_intersection(Ro, Rd,
 														objects[i]->plane.position,
 														objects[i]->plane.normal);
@@ -300,30 +300,25 @@ void raycasting()
 							best_i = i;
 						}
 					}
-					//printf("Current x is: %d and y is: %d\n", x, y);
-					if (best_t > 0 && best_t != INFINITY) {
+					if (best_t > 0 && best_t != INFINITY) { // after objects have been parsed through, evaluates if there was a dominant intersection
 						current_pixel.r = objects[best_i]->color[0] * 255;
 						current_pixel.g = objects[best_i]->color[1] * 255; // magnifies the color value between 0 and 1 (inclusive) by 255 to obtain the proper RGB color value
 						current_pixel.b = objects[best_i]->color[2] * 255;
 						
-						*temp_ptr = current_pixel;
+						*temp_ptr = current_pixel; // sets current image_data struct in temp_ptr to current_pixel colored from object 
 						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
 		
 						current_pixel.r = 0;
 						current_pixel.g = 0; // resets current pixel RGB values to 0 after coloring current pixel
 						current_pixel.b = 0;
-						printf("#");
-					} else {
-						//printf("Didn't hit, coloring black.");
+					} else { // no dominant intersection found at current point so pixel is to be colored black
 						current_pixel.r = 0;
 						current_pixel.g = 0; // resets current pixel RGB values to 0 since current_pixel is not colored (non-white in this case)
 						current_pixel.b = 0;		
-						//*(temp_ptr + (M * N) - (x * M) + y - 1) = current_pixel;
-						*temp_ptr = current_pixel;
+						*temp_ptr = current_pixel;  // sets current image_data struct in temp_ptr to current_pixel colored from object 
 						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
-					    printf(".");
 					}
-      
+     
 			}			
 			printf("\n");
 			}	
