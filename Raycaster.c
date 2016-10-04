@@ -572,7 +572,6 @@ void read_scene(char* filename) {
 	  c = next_c(json);
 	  if (c == '}') {
 	    // stop parsing this object
-	    //printf("Finished parsing object so incrementing iterator. Before increment: %d\n", i);
 	    i++;
 	    break;
 	  } else if (c == ',') {
@@ -586,29 +585,34 @@ void read_scene(char* filename) {
 	      (strcmp(key, "height") == 0) ||
 	      (strcmp(key, "radius") == 0)) {
 	    double value = next_number(json);
-		if(strcmp(key, "width") == 0)
+		if(strcmp(key, "width") == 0 && objects[i]->kind == 0)
 		{
 			printf("Currently assigning width: %f.\n", value);
 			objects[i]->camera.width = value;
 			glob_width = value; // stores camera width to prevent need to iterate through objects later
 		}
-		else if(strcmp(key, "height") == 0)
+		else if(strcmp(key, "height") == 0 && objects[i]-> kind == 0)
 		{
 			printf("Currently assigning height %f.\n", value);
 			objects[i]->camera.height = value; 
 			glob_height = value; // stores camera height to prevent need to iterate through objects later
 		}
-		else
+		else if(strcmp(key, "radius") == 0 && objects[i]-> kind == 1)
 		{
 			printf("Currently assigning radius %f.\n", value);
 			objects[i]->sphere.radius = value;
+		}
+		else
+		{
+			fprintf(stderr, "Error: Only cameras should have width/height and spheres have radius. Violation found on line number %d.\n", line);
+            exit(1);
 		}
 		
 	  } else if ((strcmp(key, "color") == 0) ||
 		     (strcmp(key, "position") == 0) ||
 		     (strcmp(key, "normal") == 0)) { // do additional error checking with color
 	    double* value = next_vector(json);
-		if(strcmp(key, "color") == 0)
+		if((strcmp(key, "color") == 0 && objects[i]->kind == 1) || (strcmp(key, "color") == 0 && objects[i]->kind == 2))
 		{
 			printf("Currently assigning colors [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			// ERROR CHECK FOR COLOR VALUE > 0 AND < 256
@@ -616,7 +620,7 @@ void read_scene(char* filename) {
 			objects[i]->color[1] = value[1];
 			objects[i]->color[2] = value[2];
 		}
-		else if(strcmp(key, "position") == 0)
+		else if((strcmp(key, "position") == 0 && objects[i]->kind == 1) || ((strcmp(key, "position") == 0 && objects[i]->kind == 2)))
 		{
 			printf("Currently assigning position [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			if(objects[i]->kind == 1)
@@ -636,12 +640,17 @@ void read_scene(char* filename) {
 				fprintf(stderr, "Error: Mismatched object field, on line %d.\n", key, line);
 			}
 		}
-		else
+		else if(strcmp(key, "normal") == 0 && objects[i]->kind == 2)
 		{
 			printf("Currently assigning normal [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
 			objects[i]->plane.normal[0] = value[0];
 			objects[i]->plane.normal[1] = value[1];
 			objects[i]->plane.normal[2] = value[2];
+		}
+		else
+		{
+			fprintf(stderr, "Error: Only spheres and planes should have color/position and only planes should have a normal. Violation found on line number %d.\n", line);
+            exit(1);
 		}
 	  } else {
 	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n",
