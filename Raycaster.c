@@ -107,8 +107,15 @@ int main(int argc, char** argv) {
 	int height = atoi(argv[2]); // the height of the scene
 	char* input_file = argv[3]; // a .json file to read from
 	char* output_file = argv[4]; // a .ppm file to output to
-  
-  // block of code which checks to make sure that user inputted a .json and .ppm file for both the input and output command line arguments
+	
+	// if statement which verifies that given length/width is not less than or equal to 0
+	if(width <= 0 || height <= 0)
+	{
+		fprintf(stderr, "Error: Given width/height must not be less than or equal to 0\n");
+		return -1;
+	}
+	
+    // block of code which checks to make sure that user inputted a .json and .ppm file for both the input and output command line arguments
 	char* temp_ptr_str;
 	int input_length = strlen(input_file);
 	int output_length = strlen(output_file);
@@ -126,53 +133,54 @@ int main(int argc, char** argv) {
 		fprintf(stderr, "Error: Output file must be a .ppm file\n");
 		return -1;
 	}
-  // end of .json/.ppm extension error checking	
+	// end of .json/.ppm extension error checking	
   
-  objects = malloc(sizeof(Object*)*129); // 128 max objects
+	objects = malloc(sizeof(Object*)*129); // allocates memory for global object buffer to maximally account for 128 objects
   
-  // block of code allocating memory to global header_buffer before its use
-  header_buffer = (struct header_data*)malloc(sizeof(struct header_data)); 
-  header_buffer->file_format = (char *)malloc(100);
-  header_buffer->file_comment = (char *)malloc(1024);
-  header_buffer->file_height = (char *)malloc(100);
-  header_buffer->file_width = (char *)malloc(100);
-  header_buffer->file_maxcolor = (char *)malloc(100);
+	// block of code allocating memory to global header_buffer before its use
+	header_buffer = (struct header_data*)malloc(sizeof(struct header_data)); 
+	header_buffer->file_format = (char *)malloc(100);
+	header_buffer->file_comment = (char *)malloc(1024);
+	header_buffer->file_height = (char *)malloc(100);
+	header_buffer->file_width = (char *)malloc(100);
+	header_buffer->file_maxcolor = (char *)malloc(100);
   
-  strcpy(header_buffer->file_format, "P3");
-  sprintf(header_buffer->file_height, "%d", height);
-  sprintf(header_buffer->file_width, "%d", width);
-  sprintf(header_buffer->file_maxcolor, "%d", 255);
+	// block of code which hardcodes file format to be read out and also stores height/width from command line. Max color value is set at 255 as well
+	strcpy(header_buffer->file_format, "P3");
+	sprintf(header_buffer->file_height, "%d", height);
+	sprintf(header_buffer->file_width, "%d", width);
+	sprintf(header_buffer->file_maxcolor, "%d", 255);
   
-  // ALSO DO ERROR CHECKING WITH GIVEN NEXT_NUM/VECTOR FUNC
   
-  image_buffer = (image_data *)malloc(sizeof(image_data) * width * height + 1);
+	// image_buffer memory allocation here
+	image_buffer = (image_data *)malloc(sizeof(image_data) * width * height + 1); // allocates memory for image based on width * height of image as given by command line
   
-  read_scene(input_file);
-  printf("Finished parsing!\n");
-  print_objects();
-  //print_pixels();
-  printf("About to start raycasting...\n");
-  raycasting();
-  printf("Done raycasting and determining pixel colors, now writing to file...\n");
-  //print_pixels();
+	read_scene(input_file);
+	printf("Finished parsing!\n");
+	print_objects();
+	//print_pixels();
+	printf("About to start raycasting...\n");
+	raycasting();
+	printf("Done raycasting and determining pixel colors, now writing to file...\n");
+	//print_pixels();
     
-   // testing code to delete file in order to prevent data overflow
-  FILE* test_fp = fopen(output_file, "r");
-  //printf("Output file name is: %s\n", output_file);
-  if(test_fp != NULL) 
-  {
-	fclose(test_fp);
-	remove(output_file);
-  }
-  else if(test_fp == NULL) printf("File doesn't exist\n");
-  // end of testing code
+	// testing code to delete file in order to prevent data overflow
+	FILE* test_fp = fopen(output_file, "r");
+	//printf("Output file name is: %s\n", output_file);
+	if(test_fp != NULL) 
+	{
+		fclose(test_fp);
+		remove(output_file);
+	}
+	else if(test_fp == NULL) printf("File doesn't exist\n");
+	// end of testing code
   
-  // ADD ERROR CHECKING FOR RIGHT COLOR VALUE (NOT > MAXCOLOR OR <)
+	// ADD ERROR CHECKING FOR RIGHT COLOR VALUE (NOT > MAXCOLOR OR <)
   
-  write_image_data(output_file);
-  printf("Done writing!\n");
+	write_image_data(output_file);
+	printf("Finished writing!\n");
   
-  return 0;
+	return 0;
 }
 
 void print_pixels()
@@ -201,13 +209,9 @@ double sphere_intersection(double* Ro, double* Rd, double* C, double r)
 	det = sqrt(det);
 	
 	double t0 = (-b - det) / (2 * a);
-	//printf("t0 value is: %lf\n", t0);
 	if(t0 > 0) return t0;
 	double t1 = (-b + det) / (2 * a);
-	//printf("t1 value is: %lf\n", t1);
 	if(t1 > 0) return t1;
-	
-	//printf("Didn't eval\n");
 	
 	return -1;
 }
@@ -217,9 +221,8 @@ double plane_intersection(double* Ro, double* Rd, double* C, double* N)
 {	
 	normalize(N); // keep or remove?
 	double Vd = ((N[0] * Rd[0]) + (N[1] * Rd[1]) + (N[2] * Rd[2]));
-	if(Vd == 0) 
+	if(Vd == 0) // parallel ray so no intersection
 	{
-		//printf("Parallel ray so no intersection.\n");
 		return -1;
 	}
 	double Vo = -((N[0] * Ro[0]) + (N[1] * Ro[1]) + (N[2] * Ro[2])) + sqrt(sqr(C[0] - Ro[0]) + sqr(C[1] - Ro[1]) + sqr(C[2] - Ro[2]));
@@ -227,24 +230,21 @@ double plane_intersection(double* Ro, double* Rd, double* C, double* N)
 	
 	double t = Vo/Vd;
 		
-	if(t > 0) 
+	if(t > 0) // found plane intersection so return t
 	{
-		//printf("Found a plane intersection.\n");
 		return t;
 	}
-	//printf("Didn't find a plane intersection.\n");
 	
-	return -1;
+	return -1; // didn't find a plane intersection so return -1
 }
 
 // function which handles raycasting for objects read in from json file
 void raycasting() 
 {
-	
 		image_data current_pixel; // temp image_data struct which will hold RGB pixels
-		image_data* temp_ptr = image_buffer; // + sizeof(image_data) * atoi(header_buffer->file_height) * atoi(header_buffer->file_width); // temp ptr to image_data struct which will be used to navigate through global buffer
+		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through global buffer
 		current_pixel.r = 0;
-		current_pixel.g = 0; // initializes current pixel RGB values to 0
+		current_pixel.g = 0; // initializes current pixel RGB values to 0 (black)
 		current_pixel.b = 0;
 		
 		double cx = 0;
@@ -255,11 +255,7 @@ void raycasting()
 		
 		double pixheight = glob_height / M;
 		double pixwidth = glob_width / N;
-		
-		printf("Global height is: %lf and width is: %lf.\n", glob_height, glob_width);
-		
-		printf("pixheight is: %lf and pixwidth is: %lf\n", pixheight, pixwidth);
-		
+				
 		double Ro[3] = {0, 0, 0};
 		double Rd[3] = {0, 0, 0};
 		double ray[3] = {0, 0, 1};
@@ -269,8 +265,6 @@ void raycasting()
 			ray[1] = (cy - (glob_height/2) + pixheight * (y + 0.5));
 			for (int x = 0; x < N; x += 1) {
 				ray[0] = cx - (glob_width/2) + pixwidth * (x + 0.5);
-				// Rd = normalize(P - Ro)
-				//normalize(ray);
 				Rd[0] = ray[0];
 				Rd[1] = ray[1];
 				Rd[2] = ray[2];
@@ -281,7 +275,6 @@ void raycasting()
 					for (int i=0; objects[i] != 0; i += 1) {
 						double t = 0;
 
-						//printf("i value is: %d.\n", i);
 						switch(objects[i]->kind) {
 						case 0:
 							break;
@@ -298,23 +291,21 @@ void raycasting()
 														
 							break;
 						default:
-						// Horrible error -> FLESH out
-						// do
+							fprintf(stderr, "Error: Unrecognized object.\n"); // Error in case siwtch doesn't evaluate as a known object but should never happen
 							exit(1);
 						}
-						if (t > 0 && t < best_t)
+						if (t > 0 && t < best_t) // stores best_t if there's a dominant intersection. Also stores best_i to record current object index
 						{
-							best_t = t;
+							best_t = t; 
 							best_i = i;
 						}
 					}
 					//printf("Current x is: %d and y is: %d\n", x, y);
 					if (best_t > 0 && best_t != INFINITY) {
 						current_pixel.r = objects[best_i]->color[0] * 255;
-						current_pixel.g = objects[best_i]->color[1] * 255;
+						current_pixel.g = objects[best_i]->color[1] * 255; // magnifies the color value between 0 and 1 (inclusive) by 255 to obtain the proper RGB color value
 						current_pixel.b = objects[best_i]->color[2] * 255;
-						//image_buffer[y * N + x] = current_pixel;						
-						//*(temp_ptr + (M * N) - (x * M) + y - 1) = current_pixel;
+						
 						*temp_ptr = current_pixel;
 						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
 		
@@ -561,7 +552,7 @@ void read_scene(char* filename) {
 
 		  
       } else {
-		fprintf(stderr, "Error: Unknown type, \"%s\", on line number %d.\n", value, line);
+		fprintf(stderr, "Error: Unknown object type, \"%s\", on line number %d.\n", value, line);
 		exit(1);
       }
 
@@ -615,7 +606,16 @@ void read_scene(char* filename) {
 		if((strcmp(key, "color") == 0 && objects[i]->kind == 1) || (strcmp(key, "color") == 0 && objects[i]->kind == 2))
 		{
 			printf("Currently assigning colors [%lf, %lf, %lf]\n", value[0], value[1], value[2]);
-			// ERROR CHECK FOR COLOR VALUE > 0 AND < 256
+
+			int j = 0;
+			for(j = 0; j < 3; j+=1) // error checking for loop to make sure color values from object are between 0 and 1 (inclusive)
+			{
+				if(value[j] < 0 || value[j] > 1) // assuming color value must be between 0 and 1 (inclusive) due to example json file given along with corresponding ppm output file indicating so
+				{
+					fprintf(stderr, "Error: Color values should be between 0 and 1 (inclusive). Violation found on line number %d.\n", line);
+					exit(1);
+				}
+			}
 			objects[i]->color[0] = value[0];
 			objects[i]->color[1] = value[1];
 			objects[i]->color[2] = value[2];
@@ -653,9 +653,7 @@ void read_scene(char* filename) {
             exit(1);
 		}
 	  } else {
-	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n",
-		    key, line);
-	    //char* value = next_string(json);
+	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n", key, line);
 	  }
 	  skip_ws(json);
 	} else {
@@ -669,7 +667,6 @@ void read_scene(char* filename) {
 		// noop
 		skip_ws(json);
       } else if (c == ']') {
-			//printf("Reached end of objects so null-terminating and current index is: %d.\n", i);
 			objects[i] = NULL; // null-terminate after last object
 			fclose(json);
 			return;
