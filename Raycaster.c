@@ -13,36 +13,32 @@
 #include <math.h>
 
 
-// function prototypes
-int next_c(FILE* json);
+// function prototypes 
+void read_scene(char* filename); // master function for parsing the input json file
 
-void expect_c(FILE* json, int d);
+void raycasting(); // master function for raycasting and coloring pixels in the global image_data buffer
 
-void skip_ws(FILE* json);
+void write_image_data(char* output_file_name); // master function for writing image data from global image_data buffer to a ppm file (P6 in this case, as was recommended by the professor)
 
-char* next_string(FILE* json);
+double sphere_intersection(double* Ro, double* Rd, double* C, double r); // checks whether or not there's a sphere intersection
 
-double next_number(FILE* json);
+double plane_intersection(double* Ro, double* Rd, double* C, double* n); // checks whether or not there's a plane intersection
 
-double* next_vector(FILE* json);
+int next_c(FILE* json); // wraps the getc() function and provides error checking and line number maintenance
 
-void read_scene(char* filename);
+void expect_c(FILE* json, int d); // checks that next character in file is d and displays error otherwise
 
-void print_objects();
+void skip_ws(FILE* json); // skips over whitespace in json file
 
-void normalize(double* v);
+char* next_string(FILE* json); // parses next string from json file
 
-void raycasting();
+double next_number(FILE* json); // parses next number from json file
 
-double sphere_intersection(double* Ro, double* Rd, double* C, double r);
+double* next_vector(FILE* json); // parses next vector from json file
 
-double plane_intersection(double* Ro, double* Rd, double* C, double* n);
+void normalize(double* v); // normalizes the given vector
 
-double sqr(double v);
-
-void write_image_data(char* output_file_name);
-
-void print_pixels(); // find way to move this
+double sqr(double v); // squares the given double value
 
 
 // object struct typedef'd as Object intended to hold any of the specified objects in the given scene (.json) file
@@ -68,7 +64,8 @@ typedef struct {
 } Object;
 
 // header_data buffer which is intended to contain all relevant header information of ppm file
-typedef struct header_data {
+typedef struct header_data 
+{
   char* file_format;
   char* file_comment;
   char* file_height;
@@ -77,7 +74,8 @@ typedef struct header_data {
 } header_data;
 
 // image_data buffer which is intended to hold a set of RGB pixels represented as unsigned char's
-typedef struct image_data {
+typedef struct image_data 
+{
   unsigned char r, g, b;
 } image_data;
 
@@ -96,8 +94,8 @@ double glob_width = 0; // global width, intended to store camera width
 double glob_height = 0; // global height, intended to store camera height
 
 
-int main(int argc, char** argv) {
-	
+int main(int argc, char** argv) 
+{
 	if(argc != 5) // checks for 5 arguments which includes the argv[0] path argument as well as the 4 required arguments of format [width height input.json output.ppm]
 	{
 		fprintf(stderr, "Error: Incorrect number of arguments; format should be -> [width height input.json output.ppm]\n");
@@ -166,304 +164,9 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-void print_pixels()
-{
-	int i = 0;
-	image_data* pixels = image_buffer;
-	printf("Width is: %d\nHeight is: %d\n", atoi(header_buffer->file_width), atoi(header_buffer->file_height));
-	while(i != atoi(header_buffer->file_width) * atoi(header_buffer->file_height) + 5)
-	{
-		printf("Printing pixel #%d...\n", i++); 
-		printf("R pixel is:%d\nG pixel is:%d\nB pixel is:%d\n", (*pixels).r, (*pixels).g, (*pixels).b);
-		pixels++;
-	}
-}
-
-// function which takes in an origin ray, direction of the ray, position of the sphere object, and radius of the sphere object and determines if there's an intersection at the current point
-double sphere_intersection(double* Ro, double* Rd, double* C, double r)
-{
-	double a = sqr(Rd[0]) + sqr(Rd[1]) + sqr(Rd[2]);
-	double b = (2 * (Ro[0] * Rd[0] - Rd[0] * C[0] + Ro[1] * Rd[1] - Rd[1] * C[1] + Ro[2] * Rd[2] - Rd[2] * C[2]));
-	double c = sqr(Ro[0]) - 2*Ro[0]*C[0] + sqr(C[0]) + sqr(Ro[1]) - 2*Ro[1]*C[1] + sqr(C[1]) + sqr(Ro[2]) - 2*Ro[2]*C[2] + sqr(C[2]) - sqr(r);
-		
-	double det = sqr(b) - 4 * a * c;
-	if(det < 0) return -1; // if determinant is negative then there's no sphere intersection so return -1
-	
-	det = sqrt(det);
-	
-	double t0 = (-b - det) / (2 * a);
-	if(t0 > 0) return t0; // t0 indicates a sphere intersection so return it
-	double t1 = (-b + det) / (2 * a);
-	if(t1 > 0) return t1; // t1 indicates a sphere intersection so return it
-	
-	return -1; // didn't find a sphere intersection so return -1
-}
-
-// function which takes in an origin ray, direction of the ray, position of the plane object, and normal of the plane object and determines if there's an intersection at the current point
-double plane_intersection(double* Ro, double* Rd, double* C, double* N)
-{	
-	normalize(N); // keep or remove?
-	double Vd = ((N[0] * Rd[0]) + (N[1] * Rd[1]) + (N[2] * Rd[2]));
-	if(Vd == 0) // parallel ray so no intersection
-	{
-		return -1;
-	}
-	double Vo = -((N[0] * Ro[0]) + (N[1] * Ro[1]) + (N[2] * Ro[2])) + sqrt(sqr(C[0] - Ro[0]) + sqr(C[1] - Ro[1]) + sqr(C[2] - Ro[2]));
-
-	
-	double t = Vo/Vd;
-		
-	if(t > 0) // found plane intersection so return t
-	{
-		return t;
-	}
-	
-	return -1; // didn't find a plane intersection so return -1
-}
-
-// function which handles raycasting for objects read in from json file
-void raycasting() 
-{
-		image_data current_pixel; // temp image_data struct which will hold RGB pixels
-		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through global buffer
-		current_pixel.r = 0;
-		current_pixel.g = 0; // initializes current pixel RGB values to 0 (black)
-		current_pixel.b = 0;
-		
-		// sets cx and cy values of camera (assumed to be at 0, 0
-		double cx = 0;
-		double cy = 0;
-		
-		// sets width and height of image based on given width/height from command line that was previously stored in the global header buffer
-		int M = atoi(header_buffer->file_height); 
-		int N = atoi(header_buffer->file_width); 
-		
-		// sets pixheight and pixwidth using M and N declared above as well as camera height/width stored in global variables glob_height/glob_width during json parsing 
-		double pixheight = glob_height / M;
-		double pixwidth = glob_width / N;
-				
-		double Ro[3] = {0, 0, 0}; // Initializes origin ray to the assumed 0, 0, 0 position
-		double Rd[3] = {0, 0, 0}; // Initializes direction of ray to 0, 0, 0 which will be changed
-		double ray[3] = {0, 0, 1}; // Initializes temporary ray with 0, 0 for the x and y values and 1 for the assumed z value position
-		
-		
-		for (int y = 0; y < M; y += 1) {
-			ray[1] = (cy - (glob_height/2) + pixheight * (y + 0.5)); // calculates y-position of ray and stores accordingly
-			for (int x = 0; x < N; x += 1) {
-				ray[0] = cx - (glob_width/2) + pixwidth * (x + 0.5); // calculates x-position of ray and stores accordingly
-				// stores the calculated ray values along with the assumed z value of 1 into the Rd vector
-				Rd[0] = ray[0];
-				Rd[1] = ray[1];
-				Rd[2] = ray[2];
-				normalize(Rd); // normalizes the Rd vector
-
-					double best_t = INFINITY;
-					int best_i = 0;
-					for (int i=0; objects[i] != 0; i += 1) { // iterates through objects
-						double t = 0; // sets t value to 0 before evaluating objects
-
-						switch(objects[i]->kind) { // switch statement used to check object type and intersection information accordingly
-						case 0: // object is a camera so break
-							break; 
-						case 1: // object is a sphere so calculate sphere intersection
-							t = sphere_intersection(Ro, Rd,
-														objects[i]->sphere.position,
-														objects[i]->sphere.radius);	
-							
-							break;
-						case 2: // object is a plane so calculate plane intersection
-							t = plane_intersection(Ro, Rd,
-														objects[i]->plane.position,
-														objects[i]->plane.normal);
-														
-							break;
-						default:
-							fprintf(stderr, "Error: Unrecognized object.\n"); // Error in case siwtch doesn't evaluate as a known object but should never happen
-							exit(1);
-						}
-						if (t > 0 && t < best_t) // stores best_t if there's a dominant intersection. Also stores best_i to record current object index
-						{
-							best_t = t; 
-							best_i = i;
-						}
-					}
-					if (best_t > 0 && best_t != INFINITY) { // after objects have been parsed through, evaluates if there was a dominant intersection
-						current_pixel.r = objects[best_i]->color[0] * 255;
-						current_pixel.g = objects[best_i]->color[1] * 255; // magnifies the color value between 0 and 1 (inclusive) by 255 to obtain the proper RGB color value
-						current_pixel.b = objects[best_i]->color[2] * 255;
-						
-						*temp_ptr = current_pixel; // sets current image_data struct in temp_ptr to current_pixel colored from object 
-						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
-		
-						current_pixel.r = 0;
-						current_pixel.g = 0; // resets current pixel RGB values to 0 after coloring current pixel
-						current_pixel.b = 0;
-					} else { // no dominant intersection found at current point so pixel is to be colored black
-						current_pixel.r = 0;
-						current_pixel.g = 0; // colors current pixel RGB values to 0 since no intersection was found
-						current_pixel.b = 0;		
-						*temp_ptr = current_pixel;  // sets current image_data struct in temp_ptr to current_pixel colored from object 
-						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
-					}
-     
-			}			
-	}	
-		return;
-}
-
-// squares given double
-double sqr(double v) {
-  return v*v;
-}
-
-// normalizes given vector
-void normalize(double* v) {
-  double len = sqrt(sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
-  v[0] /= len;
-  v[1] /= len;
-  v[2] /= len;
-}
-
-// helper function
-void print_objects()
-{
-	int i = 0;
-	while(objects[i] != NULL)
-	{
-			if(objects[i]->kind == 0)
-			{
-				printf("#%d object is a camera\n", i);
-				printf("Camera width is: %lf\n", objects[i]->camera.width);
-				printf("Camera height is: %lf\n", objects[i]->camera.height);
-				printf("-------------------------------------------------------\n");
-				i++;
-			}
-			else if(objects[i]->kind == 1)
-			{
-				printf("#%d object is a sphere\n", i);
-				printf("Sphere color is: [%lf, %lf, %lf]\n", objects[i]->color[0], objects[i]->color[1], objects[i]->color[2]);
-				printf("Sphere position is: [%lf, %lf, %lf]\n", objects[i]->sphere.position[0], objects[i]->sphere.position[1], objects[i]->sphere.position[2]);
-				printf("Sphere radius is: %lf\n", objects[i]->sphere.radius);
-				printf("-------------------------------------------------------\n");
-				i++;
-			}
-			else if(objects[i]->kind == 2)
-			{
-				printf("#%d object is a plane\n", i);
-				printf("Plane color is: [%lf, %lf, %lf]\n", objects[i]->color[0], objects[i]->color[1], objects[i]->color[2]);
-				printf("Plane position is: [%lf, %lf, %lf]\n", objects[i]->plane.position[0], objects[i]->plane.position[1], objects[i]->plane.position[2]);
-				printf("Plane normal is: [%lf, %lf, %lf]\n", objects[i]->plane.normal[0], objects[i]->plane.normal[1], objects[i]->plane.normal[2]);
-				printf("-------------------------------------------------------\n");
-				i++;
-			}
-			else
-			{
-				fprintf(stderr, "Error: Unrecognized object.\n");
-				exit(1);
-			}
-
-	}
-}
-
-// next_c() wraps the getc() function and provides error checking and line number maintenance
-int next_c(FILE* json) {
-  int c = fgetc(json);
-#ifdef DEBUG
-  printf("next_c: '%c'\n", c);
-#endif
-  if (c == '\n') {
-    line += 1;
-  }
-  if (c == EOF) {
-    fprintf(stderr, "Error: Unexpected end of file on line number %d.\n", line);
-    exit(1);
-  }
-  return c;
-}
-
-
-// expect_c() checks that the next character is d.  If it is not it emits an error.
-void expect_c(FILE* json, int d) {
-  int c = next_c(json);
-  if (c == d) return;
-  fprintf(stderr, "Error: Expected '%c' on line %d.\n", d, line);
-  exit(1);    
-}
-
-
-// skip_ws() skips white space in the file.
-void skip_ws(FILE* json) {
-  int c = next_c(json);
-  while (isspace(c)) {
-    c = next_c(json);
-  }
-  ungetc(c, json);
-}
-
-
-// next_string() gets the next string from the file handle and emits an error if a string can not be obtained.
-char* next_string(FILE* json) {
-  char buffer[129];
-  int c = next_c(json);
-  if (c != '"') {
-    fprintf(stderr, "Error: Expected string on line %d.\n", line);
-    exit(1);
-  }  
-  c = next_c(json);
-  int i = 0;
-  while (c != '"') {
-    if (i >= 128) {
-      fprintf(stderr, "Error: Strings longer than 128 characters in length are not supported.\n");
-      exit(1);      
-    }
-    if (c == '\\') {
-      fprintf(stderr, "Error: Strings with escape codes are not supported.\n");
-      exit(1);      
-    }
-    if (c < 32 || c > 126) {
-      fprintf(stderr, "Error: Strings may contain only ascii characters.\n");
-      exit(1);
-    }
-    buffer[i] = c;
-    i += 1;
-    c = next_c(json);
-  }
-  buffer[i] = 0;
-  return strdup(buffer);
-}
-
-// function which reads next number from file, wrapped around error checking if nothing is read in
-double next_number(FILE* json) {
-  double value;
-  if(fscanf(json, "%lf", &value) == 0) // error checking to make sure fscanf read in a number; will only evaluate if fscanf didn't read anything in and returned 0
-  {
-	  fprintf(stderr, "Error: Expected a number on line %d.\n", line);
-      exit(1);	
-  }
-  return value;
-}
-
-// function which reads next vector from file
-double* next_vector(FILE* json) {
-  double* v = malloc(3*sizeof(double));
-  expect_c(json, '[');
-  skip_ws(json);
-  v[0] = next_number(json);
-  skip_ws(json);
-  expect_c(json, ',');
-  skip_ws(json);
-  v[1] = next_number(json);
-  skip_ws(json);
-  expect_c(json, ',');
-  skip_ws(json);
-  v[2] = next_number(json);
-  skip_ws(json);
-  expect_c(json, ']');
-  return v;
-}
-
 // function which parses information from given json input file
-void read_scene(char* filename) {
+void read_scene(char* filename) 
+{
   int c;
   FILE* json = fopen(filename, "r");
 
@@ -680,6 +383,96 @@ void read_scene(char* filename) {
   }
 }
 
+// function which handles raycasting for objects read in from json file
+void raycasting() 
+{
+		image_data current_pixel; // temp image_data struct which will hold RGB pixels
+		image_data* temp_ptr = image_buffer; // temp ptr to image_data struct which will be used to navigate through global buffer
+		current_pixel.r = 0;
+		current_pixel.g = 0; // initializes current pixel RGB values to 0 (black)
+		current_pixel.b = 0;
+		
+		// sets cx and cy values of camera (assumed to be at 0, 0
+		double cx = 0;
+		double cy = 0;
+		
+		// sets width and height of image based on given width/height from command line that was previously stored in the global header buffer
+		int M = atoi(header_buffer->file_height); 
+		int N = atoi(header_buffer->file_width); 
+		
+		// sets pixheight and pixwidth using M and N declared above as well as camera height/width stored in global variables glob_height/glob_width during json parsing 
+		double pixheight = glob_height / M;
+		double pixwidth = glob_width / N;
+				
+		double Ro[3] = {0, 0, 0}; // Initializes origin ray to the assumed 0, 0, 0 position
+		double Rd[3] = {0, 0, 0}; // Initializes direction of ray to 0, 0, 0 which will be changed
+		double ray[3] = {0, 0, 1}; // Initializes temporary ray with 0, 0 for the x and y values and 1 for the assumed z value position
+		
+		
+		for (int y = 0; y < M; y += 1) {
+			ray[1] = (cy - (glob_height/2) + pixheight * (y + 0.5)); // calculates y-position of ray and stores accordingly
+			for (int x = 0; x < N; x += 1) {
+				ray[0] = cx - (glob_width/2) + pixwidth * (x + 0.5); // calculates x-position of ray and stores accordingly
+				// stores the calculated ray values along with the assumed z value of 1 into the Rd vector
+				Rd[0] = ray[0];
+				Rd[1] = ray[1];
+				Rd[2] = ray[2];
+				normalize(Rd); // normalizes the Rd vector
+
+					double best_t = INFINITY;
+					int best_i = 0;
+					for (int i=0; objects[i] != 0; i += 1) { // iterates through objects
+						double t = 0; // sets t value to 0 before evaluating objects
+
+						switch(objects[i]->kind) { // switch statement used to check object type and intersection information accordingly
+						case 0: // object is a camera so break
+							break; 
+						case 1: // object is a sphere so calculate sphere intersection
+							t = sphere_intersection(Ro, Rd,
+														objects[i]->sphere.position,
+														objects[i]->sphere.radius);	
+							
+							break;
+						case 2: // object is a plane so calculate plane intersection
+							t = plane_intersection(Ro, Rd,
+														objects[i]->plane.position,
+														objects[i]->plane.normal);
+														
+							break;
+						default:
+							fprintf(stderr, "Error: Unrecognized object.\n"); // Error in case siwtch doesn't evaluate as a known object but should never happen
+							exit(1);
+						}
+						if (t > 0 && t < best_t) // stores best_t if there's a dominant intersection. Also stores best_i to record current object index
+						{
+							best_t = t; 
+							best_i = i;
+						}
+					}
+					if (best_t > 0 && best_t != INFINITY) { // after objects have been parsed through, evaluates if there was a dominant intersection
+						current_pixel.r = objects[best_i]->color[0] * 255;
+						current_pixel.g = objects[best_i]->color[1] * 255; // magnifies the color value between 0 and 1 (inclusive) by 255 to obtain the proper RGB color value
+						current_pixel.b = objects[best_i]->color[2] * 255;
+						
+						*temp_ptr = current_pixel; // sets current image_data struct in temp_ptr to current_pixel colored from object 
+						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+		
+						current_pixel.r = 0;
+						current_pixel.g = 0; // resets current pixel RGB values to 0 after coloring current pixel
+						current_pixel.b = 0;
+					} else { // no dominant intersection found at current point so pixel is to be colored black
+						current_pixel.r = 0;
+						current_pixel.g = 0; // colors current pixel RGB values to 0 since no intersection was found
+						current_pixel.b = 0;		
+						*temp_ptr = current_pixel;  // sets current image_data struct in temp_ptr to current_pixel colored from object 
+						temp_ptr++; // increments temp_ptr to point to next image_data struct in global buffer
+					}
+     
+			}			
+	}	
+		return;
+}
+
 // write_image_data function takes in the output_file_name to know where to write out to
 void write_image_data(char* output_file_name)
 {
@@ -721,4 +514,161 @@ void write_image_data(char* output_file_name)
 	}
 		
 	fclose(fp);
+}
+
+// function which takes in an origin ray, direction of the ray, position of the sphere object, and radius of the sphere object and determines if there's an intersection at the current point
+double sphere_intersection(double* Ro, double* Rd, double* C, double r)
+{
+	double a = sqr(Rd[0]) + sqr(Rd[1]) + sqr(Rd[2]);
+	double b = (2 * (Ro[0] * Rd[0] - Rd[0] * C[0] + Ro[1] * Rd[1] - Rd[1] * C[1] + Ro[2] * Rd[2] - Rd[2] * C[2]));
+	double c = sqr(Ro[0]) - 2*Ro[0]*C[0] + sqr(C[0]) + sqr(Ro[1]) - 2*Ro[1]*C[1] + sqr(C[1]) + sqr(Ro[2]) - 2*Ro[2]*C[2] + sqr(C[2]) - sqr(r);
+		
+	double det = sqr(b) - 4 * a * c;
+	if(det < 0) return -1; // if determinant is negative then there's no sphere intersection so return -1
+	
+	det = sqrt(det);
+	
+	double t0 = (-b - det) / (2 * a);
+	if(t0 > 0) return t0; // t0 indicates a sphere intersection so return it
+	double t1 = (-b + det) / (2 * a);
+	if(t1 > 0) return t1; // t1 indicates a sphere intersection so return it
+	
+	return -1; // didn't find a sphere intersection so return -1
+}
+
+// function which takes in an origin ray, direction of the ray, position of the plane object, and normal of the plane object and determines if there's an intersection at the current point
+double plane_intersection(double* Ro, double* Rd, double* C, double* N)
+{	
+	normalize(N); // keep or remove?
+	double Vd = ((N[0] * Rd[0]) + (N[1] * Rd[1]) + (N[2] * Rd[2]));
+	if(Vd == 0) // parallel ray so no intersection
+	{
+		return -1;
+	}
+	double Vo = -((N[0] * Ro[0]) + (N[1] * Ro[1]) + (N[2] * Ro[2])) + sqrt(sqr(C[0] - Ro[0]) + sqr(C[1] - Ro[1]) + sqr(C[2] - Ro[2]));
+
+	
+	double t = Vo/Vd;
+		
+	if(t > 0) // found plane intersection so return t
+	{
+		return t;
+	}
+	
+	return -1; // didn't find a plane intersection so return -1
+}
+
+// next_c() wraps the getc() function and provides error checking and line number maintenance
+int next_c(FILE* json) 
+{
+  int c = fgetc(json);
+#ifdef DEBUG
+  printf("next_c: '%c'\n", c);
+#endif
+  if (c == '\n') {
+    line += 1;
+  }
+  if (c == EOF) {
+    fprintf(stderr, "Error: Unexpected end of file on line number %d.\n", line);
+    exit(1);
+  }
+  return c;
+}
+
+// expect_c() checks that the next character is d.  If it is not it emits an error.
+void expect_c(FILE* json, int d) 
+{
+  int c = next_c(json);
+  if (c == d) return;
+  fprintf(stderr, "Error: Expected '%c' on line %d.\n", d, line);
+  exit(1);    
+}
+
+// skip_ws() skips white space in the file.
+void skip_ws(FILE* json) 
+{
+  int c = next_c(json);
+  while (isspace(c)) {
+    c = next_c(json);
+  }
+  ungetc(c, json);
+}
+
+// next_string() gets the next string from the file handle and emits an error if a string can not be obtained.
+char* next_string(FILE* json) 
+{
+  char buffer[129];
+  int c = next_c(json);
+  if (c != '"') {
+    fprintf(stderr, "Error: Expected string on line %d.\n", line);
+    exit(1);
+  }  
+  c = next_c(json);
+  int i = 0;
+  while (c != '"') {
+    if (i >= 128) {
+      fprintf(stderr, "Error: Strings longer than 128 characters in length are not supported.\n");
+      exit(1);      
+    }
+    if (c == '\\') {
+      fprintf(stderr, "Error: Strings with escape codes are not supported.\n");
+      exit(1);      
+    }
+    if (c < 32 || c > 126) {
+      fprintf(stderr, "Error: Strings may contain only ascii characters.\n");
+      exit(1);
+    }
+    buffer[i] = c;
+    i += 1;
+    c = next_c(json);
+  }
+  buffer[i] = 0;
+  return strdup(buffer);
+}
+
+// function which reads next number from file, wrapped around error checking if nothing is read in
+double next_number(FILE* json) 
+{
+  double value;
+  if(fscanf(json, "%lf", &value) == 0) // error checking to make sure fscanf read in a number; will only evaluate if fscanf didn't read anything in and returned 0
+  {
+	  fprintf(stderr, "Error: Expected a number on line %d.\n", line);
+      exit(1);	
+  }
+  return value;
+}
+
+// function which reads next vector from file
+double* next_vector(FILE* json) 
+{
+  double* v = malloc(3*sizeof(double));
+  expect_c(json, '[');
+  skip_ws(json);
+  v[0] = next_number(json);
+  skip_ws(json);
+  expect_c(json, ',');
+  skip_ws(json);
+  v[1] = next_number(json);
+  skip_ws(json);
+  expect_c(json, ',');
+  skip_ws(json);
+  v[2] = next_number(json);
+  skip_ws(json);
+  expect_c(json, ']');
+  return v;
+}
+
+// normalizes given vector
+void normalize(double* v) 
+{
+  double len = sqrt(sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
+  v[0] /= len;
+  v[1] /= len;
+  v[2] /= len;
+}
+
+// squares given double
+double sqr(double v) 
+{
+  return v*v;
 }
