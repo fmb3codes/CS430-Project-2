@@ -1,6 +1,6 @@
-all: Raycaster.c
-	gcc Raycaster.c -o Raycaster
+all: raycast.c
+	gcc raycast.c -o raycast
 
 clean:
-	rm -rf Raycaster *~
+	rm -rf raycast *~
 
