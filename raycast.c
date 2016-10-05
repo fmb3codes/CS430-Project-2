@@ -201,6 +201,16 @@ void read_scene(char* filename)
     c = fgetc(json);
     if (c == '{') 
 	{
+	  // error-checking variables to make sure enough UNIQUE fields have been read-in for object after its been parsed.
+	  int camera_height_read = 0;
+	  int camera_width_read = 0;
+	  int sphere_color_read = 0;
+	  int sphere_position_read = 0;
+	  int sphere_radius_read = 0;
+	  int plane_color_read = 0;
+	  int plane_position_read = 0;
+	  int plane_normal_read = 0;
+	  
       skip_ws(json);
     
       // Parse the object
@@ -256,7 +266,41 @@ void read_scene(char* filename)
 	  if (c == '}') 
 	  {
 	    // stop parsing this object
-	    i++;
+		// block of error checking code to first identify the current object that's finished parsing, and then checks to see if enough fields have been read in for that object.
+		if(objects[i]->kind == 0)
+		{
+			if(camera_width_read != 1 || camera_height_read != 1)
+			{
+				fprintf(stderr, "Error: Object #%d (0-indexed) is a camera which should have two unique fields: width/height\n", i);
+				exit(1);
+			}
+		}
+		else if(objects[i]->kind == 1)
+		{
+			if(sphere_color_read != 1 ||  sphere_position_read != 1 || sphere_radius_read != 1)
+			{
+				fprintf(stderr, "Error: Object #%d (0-indexed) is a sphere which should have three unique fields: color/position/radius\n", i);
+				exit(1);
+			}
+		}
+		else if(objects[i]->kind == 2)
+		{
+			if(plane_color_read != 1 ||  plane_position_read != 1 || plane_normal_read != 1)
+			{
+				fprintf(stderr, "Error: Object #%d (0-indexed) is a plane which should have three unique fields: color/position/normal\n", i);
+				exit(1);
+			}
+		}
+	    i++; // increments object iterator
+		// resets all error-checking variables back to 0
+		int camera_height_read = 0;
+		int camera_width_read = 0;
+		int sphere_color_read = 0;
+		int sphere_position_read = 0;
+		int sphere_radius_read = 0;
+		int plane_color_read = 0;
+		int plane_position_read = 0;
+		int plane_normal_read = 0;
 	    break;
 	  } 
 	  else if (c == ',') 
@@ -276,11 +320,13 @@ void read_scene(char* filename)
 		{
 			objects[i]->camera.width = value;
 			glob_width = value; // stores camera width to prevent need to iterate through objects later
+			camera_width_read++;
 		}
 		else if(strcmp(key, "height") == 0 && objects[i]-> kind == 0) // evaluates only if key is height and current object is a camera
 		{
 			objects[i]->camera.height = value; 
 			glob_height = value; // stores camera height to prevent need to iterate through objects later
+			camera_height_read++;
 		}
 		else if(strcmp(key, "radius") == 0 && objects[i]-> kind == 1) // evaluates only if key is radius and current object is a sphere
 		{
@@ -290,6 +336,7 @@ void read_scene(char* filename)
 				exit(1);
 			}
 			objects[i]->sphere.radius = value;
+			sphere_radius_read++;
 		}
 		else // after key was identified as width/height/radius, object type is unknown so display an error
 		{
@@ -317,6 +364,14 @@ void read_scene(char* filename)
 			objects[i]->color[0] = value[0];
 			objects[i]->color[1] = value[1]; // assigns color values from value vector to current object 
 			objects[i]->color[2] = value[2];
+			if(objects[i]->kind == 1)
+			{
+				sphere_color_read++;
+			}
+			else if(objects[i]->kind == 2)
+			{
+				plane_color_read++;
+			}
 		}
 		else if((strcmp(key, "position") == 0 && objects[i]->kind == 1) || ((strcmp(key, "position") == 0 && objects[i]->kind == 2))) // evaluates only if key is position and current object is a sphere or plane
 		{
@@ -325,16 +380,19 @@ void read_scene(char* filename)
 				objects[i]->sphere.position[0] = value[0];
 				objects[i]->sphere.position[1] = -value[1]; // assigns position values from value vector to current sphere object 
 				objects[i]->sphere.position[2] = value[2];
+				sphere_position_read++;
 			}
 			else if(objects[i]->kind == 2)
 			{
 				objects[i]->plane.position[0] = value[0];
 				objects[i]->plane.position[1] = value[1]; // assigns position values from value vector to current plane object 
 				objects[i]->plane.position[2] = value[2];
+				plane_position_read++;
 			}
 			else // Evaluates if there is a mismatched object field with sphere/plane and position, but should never happen
 			{
 				fprintf(stderr, "Error: Mismatched object field, on line %d.\n", key, line);
+				exit(1);
 			}
 		}
 		else if(strcmp(key, "normal") == 0 && objects[i]->kind == 2) // evaluates only if key is normal and current object is a plane
@@ -342,6 +400,7 @@ void read_scene(char* filename)
 			objects[i]->plane.normal[0] = value[0];
 			objects[i]->plane.normal[1] = value[1]; // assigns normal values from value vector to current plane object 
 			objects[i]->plane.normal[2] = value[2];
+			plane_normal_read++;
 		}
 		else // after key was identified as color/position/normal, object type is unknown so display an error
 		{
@@ -352,6 +411,7 @@ void read_scene(char* filename)
 	  else // unknown field was read in so display an error
 	  { 
 	    fprintf(stderr, "Error: Unknown property, \"%s\", on line %d.\n", key, line);
+		exit(1);
 	  }
 	  skip_ws(json);
 	  } 
