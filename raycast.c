@@ -284,6 +284,11 @@ void read_scene(char* filename)
 		}
 		else if(strcmp(key, "radius") == 0 && objects[i]-> kind == 1) // evaluates only if key is radius and current object is a sphere
 		{
+			if(value <= 0) // error check to make sure a negative radius isn't read in from json file
+			{
+				fprintf(stderr, "Error: Sphere radius should not be less than or equal to 0. Violation found on line number %d.\n", line);
+				exit(1);
+			}
 			objects[i]->sphere.radius = value;
 		}
 		else // after key was identified as width/height/radius, object type is unknown so display an error
